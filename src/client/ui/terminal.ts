@@ -160,6 +160,9 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
     scrollback: 5000,
     allowProposedApi: true,
     macOptionIsMeta: true,
+    // A program that reads the mouse (Claude Code does) takes every drag for itself, so on a Mac
+    // ⌥-drag selects text anyway, the way Shift-drag does elsewhere. ⌘C then copies it.
+    macOptionClickForcesSelection: true,
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
@@ -365,6 +368,19 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   });
 
   term.open(host);
+  // OSC 52 is how a program puts text on the clipboard: Claude Code's /copy, or tmux and vim when
+  // told to. The text arrives base64 encoded; a query ('?') gets no answer, so nothing is read back.
+  term.parser.registerOscHandler(52, (data) => {
+    const b64 = data.slice(data.indexOf(';') + 1);
+    if (!b64 || b64 === '?') return true;
+    try {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      void navigator.clipboard?.writeText(new TextDecoder().decode(bytes)).catch(() => undefined);
+    } catch {
+      // Not base64: nothing to copy.
+    }
+    return true;
+  });
   const sendEsc = () => {
     sendSize(true);
     sayTyping();

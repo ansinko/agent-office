@@ -8,6 +8,7 @@ import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
+import { workerRestroomRefusal } from '../restroom.js';
 
 /**
  * Pull request `n` on a floor, for a worker to have as its own: one that's open, or merged and still
@@ -93,7 +94,11 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
         const w = findWorker(floor.workers.list(), key);
         if (typeof w === 'string') results.push({ worker: key, error: w });
         else if (w.id === me.id) results.push({ worker: w.name, id: w.id, error: "That's you: someone else has to send you home" });
-        else if (!going.some((g) => g.w === w)) going.push({ w });
+        else {
+          const refused = workerRestroomRefusal(w.deskId);
+          if (refused) results.push({ worker: w.name, id: w.id, error: refused });
+          else if (!going.some((g) => g.w === w)) going.push({ w });
+        }
       }
     }
     // One at a time: git takes a lock on the repository's refs to delete a branch.
@@ -116,6 +121,8 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const w = findWorker(floor.workers.list(), str(b.worker, 64));
     if (typeof w === 'string') return send(res, 404, { error: w });
     if (w.id === me.id) return send(res, 400, { error: "That's you" });
+    const refused = workerRestroomRefusal(w.deskId);
+    if (refused) return send(res, 403, { error: refused });
     // A shell would run it as a command, in someone's terminal.
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
     const text = str(b.prompt, 20000).replace(/\r\n?/g, '\n').trim();

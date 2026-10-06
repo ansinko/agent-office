@@ -50,6 +50,7 @@ export const workerHandlers = {
   },
   'worker.resume'(ctx, c, msg) {
     const w = workerOf(ctx, msg.workerId);
+    if (w && refusedInRestroom(ctx, c, w.floor, w.info.deskId, 'prompt')) return;
     ctx.warn(c, w ? w.floor.workers.resume(w.wid) : 'No such worker');
   },
   'worker.kill'(ctx, c, msg) {

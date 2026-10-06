@@ -1,6 +1,7 @@
 /**
  * Sitting down: on a chair, a stool, the couch, the throne. Sitting there already, E gets you up, or
- * does what the seat's for (the TV from the couch, Minesweeper from the boss's chair, the bar's menu).
+ * does what the seat's for (the TV from the couch, Minesweeper from the boss's chair, the bar's menu,
+ * or what another feature makes of a seat with its flag: see useSeatAs).
  */
 import { seatPlace, type SeatDef, type SeatPlace } from '../../../shared/layout';
 import type { Ctx } from '../../core/context';
@@ -30,7 +31,43 @@ export interface SeatingDeps {
   usable(): (readonly Interactable[])[];
 }
 
+/** The flags a seat in SEATING can carry (see SeatDef): what it's for besides sitting. */
+export type SeatFlag = { [K in keyof SeatDef]-?: NonNullable<SeatDef[K]> extends boolean ? K : never }[keyof SeatDef];
+
+/** What a feature makes of the seats with its flag (see useSeatAs): E while sitting there, and getting up. */
+export interface SeatUse {
+  /** What E does while you sit there, for the hint bar. */
+  label(seat: SeatDef): string;
+  /** E while you sit there. */
+  use(seat: SeatDef): void;
+  /**
+   * Whether you may get up now, by E or by walking off. False keeps you seated, and the feature calls
+   * `getUp` once you may (after asking you, say).
+   */
+  mayGetUp?(seat: SeatDef, getUp: () => void): boolean;
+}
+
 export function installSeating(ctx: Ctx, deps: SeatingDeps) {
+  /** What the features make of the seats with their flags, by flag (see useSeatAs). */
+  const uses = new Map<SeatFlag, SeatUse>();
+
+  /** Hands the seats flagged `flag` to `use`: E while sitting there, and getting up. */
+  function useSeatAs(flag: SeatFlag, use: SeatUse) {
+    uses.set(flag, use);
+  }
+
+  /** What a feature makes of `seat`, if one has taken its flag. */
+  function useOf(seat: SeatDef): SeatUse | undefined {
+    for (const [flag, use] of uses) if (seat[flag]) return use;
+    return undefined;
+  }
+
+  /** The seat you're sitting on, if any. */
+  function sittingOn(): SeatDef | undefined {
+    const id = ctx.player.seat?.seatId;
+    return id ? ctx.plan().seatingById.get(id) : undefined;
+  }
+
   /** The free place on a seat nearest you, or null when everyone else on your floor has taken them all. */
   function freePlace(seat: SeatDef): SeatPlace | null {
     const taken = new Set<string>();
@@ -60,10 +97,12 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
     if (!seat) return;
     const player = ctx.player;
     if (player.seat?.seatId === seatId) {
+      const use = useOf(seat);
       if (seat.tv && tvShowing()) deps.watchShare();
       else if (seat.game) deps.arcade.play();
       else if (seat.bar) deps.showBar();
-      else standUp();
+      else if (use) use.use(seat);
+      else if (mayGetUp()) standUp();
       return;
     }
     const place = freePlace(seat);
@@ -99,6 +138,14 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
   }
   ctx.player.onStand = gotUp;
 
+  /** Whether the seat you're on lets you up now: false while its feature asks you first. */
+  function mayGetUp(): boolean {
+    const seat = sittingOn();
+    const use = seat && useOf(seat);
+    return !seat || !use?.mayGetUp || use.mayGetUp(seat, standUp);
+  }
+  ctx.player.mayGetUp = mayGetUp;
+
   /** What you're sitting on, so it's what E is about unless you're looking at something else. */
   function mySeat(): Interactable | null {
     const id = ctx.player.seat?.seatId;
@@ -112,8 +159,8 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
       if (!seat) return { k: '', parts: [] };
       if (ctx.player.seat?.seatId === seat.id) {
         const tv = !!seat.tv && tvShowing();
-        const use = tv ? 'Watch the TV' : seat.game ? 'Play Minesweeper' : seat.bar ? 'Order a drink' : '';
-        return { k: `${seat.id}|sitting|${tv}`, parts: [hintTitle(seat.label), aside('sitting'), ...(use ? [key('E', use), key('W A S D', 'Get up')] : [key('E', 'Get up')])] };
+        const use = tv ? 'Watch the TV' : seat.game ? 'Play Minesweeper' : seat.bar ? 'Order a drink' : (useOf(seat)?.label(seat) ?? '');
+        return { k: `${seat.id}|sitting|${tv}|${use}`, parts: [hintTitle(seat.label), aside('sitting'), ...(use ? [key('E', use), key('W A S D', 'Get up')] : [key('E', 'Get up')])] };
       }
       const full = !freePlace(seat);
       return { k: `${seat.id}|${full}`, parts: [hintTitle(seat.label), seat.game ? aside('💣 Minesweeper on the monitor') : '', full ? aside('no room') : key('E', 'Sit down')] };
@@ -123,5 +170,5 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
     }),
   });
 
-  return { freePlace, standUp, mySeat };
+  return { freePlace, standUp, mySeat, useSeatAs };
 }

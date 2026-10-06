@@ -13,6 +13,7 @@ import type { Ctx } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
 import { pastTheWing } from '../../core/floors';
 import { noOutline } from '../../core/outline';
+import { outfitAt } from '../../core/stations';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder } from '../../nextup';
 import { waitingOnSomeone } from '../../notify';
@@ -114,7 +115,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
         sendoffs.vacate(w.deskId);
         const model = new Worker(w.name, w.color);
         model.setCostume(store.theme.active);
-        model.setOutfit(plan().agents.outfit === 'peasant' ? 'peasant' : null);
+        model.setOutfit(outfitAt(plan(), desk.def));
         model.setAge(ageOf(w));
         desk.seatAnchor.add(model.root);
         // Its globe floats beside the laptop (or the kiosk's counter), out from behind the card over

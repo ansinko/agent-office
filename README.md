@@ -39,6 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
+- **Ideas from the restroom.** Through the WC door past the gong, every floor has a restroom. Sit on the toilet and press **E** to tell the hajzel baba an idea: she asks what it's for and how far it goes, then files it on the floor's GitHub repo as an issue labelled `idea` once you say yes. Only whoever sits on the toilet can talk to her, and only on a floor with a GitHub repo.
 - **Together.** Voice, chat, screen sharing on the lounge TV and a shared whiteboard.
 - **A showcase on the wall.** The meeting room's big screen shows a web page everyone sees, live: an app the team keeps an eye on, the lunch menu. Switch between its saved pages with a click or let them take turns, and press **E** to use the page itself. See [the meeting room's screen](docs/features.md).
 
@@ -369,7 +370,7 @@ deploy/coolify.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 | W A S D | Walk (hold Shift to run) |
 | Space | Jump |
 | Mouse drag / wheel | Orbit / zoom the camera |
-| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator |
+| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator; on the restroom's toilet, tell the hajzel baba an idea |
 | P | Give a task to a new worker, or to the one at this desk |
 | C | See a worker's changes: diff, commit, open a PR |
 | N | Go to the next worker that's waiting on you |

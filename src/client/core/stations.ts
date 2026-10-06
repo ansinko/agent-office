@@ -1,6 +1,7 @@
 /** The board agents: what each is for, and the ones waiting by their boards before anyone has asked them anything. */
-import { STATION_AGENT, type StationKind } from '../../shared/layout';
-import { Worker } from '../world/character';
+import { STATION_AGENT, type DeskDef, type StationKind } from '../../shared/layout';
+import type { MapPlan } from '../../shared/maps';
+import { Worker, type Outfit } from '../world/character';
 import type { DeskView } from '../world/types';
 import type { World } from '../world/world';
 import { noOutline } from './outline';
@@ -12,6 +13,12 @@ export const STATION_INFO: Record<StationKind, { icon: string; offer: string; do
   queue: { icon: '📋', offer: 'Ask me to queue work', does: 'I turn it into tasks for fresh workers', example: 'Queue every open bug issue, most important first' },
   restroom: { icon: '🧻', offer: 'Have a seat and tell me', does: 'I turn your ideas into GitHub issues', example: 'The dog could fetch the newspaper every morning' },
 };
+
+/** What a worker at `def` wears on map `plan`: the hajzel baba her apron, everyone else the map's outfit. */
+export function outfitAt(plan: MapPlan, def: DeskDef | undefined): Outfit | null {
+  if (def?.station === 'restroom') return 'attendant';
+  return plan.agents.outfit === 'peasant' ? 'peasant' : null;
+}
 
 /** A board agent waiting by its board before anyone has asked it anything (see buildKiosk), and where. */
 export interface IdleAgent {
@@ -29,7 +36,7 @@ export function idleAgentsIn(w: World): IdleAgent[] {
     const model = new Worker(agent.name, agent.color);
     model.setStatus('idle', false);
     model.setTask({ name: STATION_INFO[kind].offer, summary: STATION_INFO[kind].does });
-    model.setOutfit(w.plan.agents.outfit === 'peasant' ? 'peasant' : null);
+    model.setOutfit(outfitAt(w.plan, def));
     view.vacancy.children[0].add(model.root);
     noOutline(model.root);
     return [{ model, view }];

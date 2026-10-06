@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
 import { isAsleep, type WorkerPr } from '../../../shared/status';
-import { beard, grime, peasantGarb, type Beard, type PeasantGarb } from '../costumes';
+import { beard, grime, type Beard } from '../costumes';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import type { WorkerRig } from './rig';
 import { ease, popIn } from './curves';
@@ -12,7 +12,7 @@ import { globe, papers } from './worker-props';
 import { DANCE, groove, type Dancing, type Stage } from './worker-dance';
 import { DEAD, STARVED, bones, crossedEyes, slump } from './worker-jail';
 import { packUp, waddle, type Leaving } from './worker-leave';
-import { dressUp, growBeard, wearGarb } from './worker-dress';
+import { dressUp, garbFor, growBeard, wearGarb, type Garb, type Outfit } from './worker-dress';
 
 /** The little Claude worker that sits at a desk. Forward is +z. */
 export class Worker {
@@ -82,8 +82,8 @@ export class Worker {
   gait = 1;
   /** Its headset, which a peasant doesn't wear. */
   private headset: THREE.Object3D[] = [];
-  /** What it wears on the map it's on (see setOutfit): a peasant's smock and coif, or its own skin. */
-  private garb: PeasantGarb | null = null;
+  /** What it wears (see setOutfit): a peasant's smock and coif, the hajzel baba's apron and headscarf, or its own skin. */
+  private garb: Garb | null = null;
   /** How worn out it looks, 0–1 (see setAge), and the beard, brows and dirt that show it. */
   private age = 0;
   private whiskers: Beard | null = null;
@@ -192,20 +192,18 @@ export class Worker {
   }
 
   /**
-   * Dresses it for the map it's on: a peasant's smock, rope belt and coif, in place of its headset,
-   * or back in just its own skin (null).
+   * Dresses it for the map it's on or the job it does, in place of its headset: a peasant's smock, rope
+   * belt and coif, the hajzel baba's apron and headscarf, or back in just its own skin (null).
    */
-  setOutfit(outfit: 'peasant' | null) {
-    if (!!this.garb === (outfit === 'peasant')) return;
+  setOutfit(outfit: Outfit | null) {
+    if ((this.garb?.outfit ?? null) === outfit) return;
     if (this.garb) {
       undress([this.garb.body, this.garb.cap]);
       this.garb.cloth.dispose();
       this.garb = null;
     }
-    if (outfit === 'peasant') {
-      let seed = 0;
-      for (const ch of this.color) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
-      this.garb = peasantGarb(seed);
+    if (outfit) {
+      this.garb = garbFor(outfit, this.color);
       this.body.add(this.garb.body, this.garb.cap);
       this.garb.cap.visible = this.costume !== 'christmas';
     }

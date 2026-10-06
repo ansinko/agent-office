@@ -40,3 +40,11 @@ export function refusedInRestroom(ctx: Ctx, c: Client, floor: RestroomFloor, des
   if (why) ctx.warn(c, why);
   return !!why;
 }
+
+/**
+ * Why another worker (through office-workers or its MCP tools) may not tell or send home the worker at
+ * `deskId`, or undefined when it may: a worker never sits on the toilet, so the hajzel baba is never its to reach.
+ */
+export function workerRestroomRefusal(deskId: string): string | undefined {
+  return deskId === RESTROOM_DESK ? 'Only whoever sits on the toilet talks to the hajzel baba' : undefined;
+}

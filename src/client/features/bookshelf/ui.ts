@@ -1,5 +1,5 @@
 import './ui.css';
-import { isDocPath, resolveDocLink, type DocFile, type DocList, type DocText } from '../../../shared/docs';
+import { isDocPath, resolveDocLink, type DocFile, type DocList, type DocSource, type DocText } from '../../../shared/docs';
 import { clip, h, openModal, setDoing, timeAgo, toast } from '../../ui/dom';
 import { markdownFile } from '../../ui/markdown';
 import { drawDiagrams } from '../../ui/mermaid';
@@ -11,6 +11,7 @@ import { drawDiagrams } from '../../ui/mermaid';
 // and the contents menu jumps to a heading. While it's open your character reads an open book.
 
 const LAST_KEY = 'agent-office.bookshelf';
+const SOURCE_KEY = 'agent-office.bookshelf.source';
 
 export interface ShelfDeps {
   /** The floor whose project it is, and the project's name. */
@@ -57,10 +58,13 @@ function rate(at: number[], text: string): number {
   return score - at[0] * 0.05;
 }
 
-/** The docs that match every word of `query`, best first; all of them, in shelf order, for none. */
+/**
+ * The docs that match every word of `query`, best first. For none, the ones on the shelf in shelf
+ * order: those .bookshelf.json hides only turn up once you filter for them.
+ */
 export function filterDocs(files: DocFile[], query: string): Hit[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) return shelfOrder(files).map((doc) => ({ doc, score: 0, title: new Set(), path: new Set() }));
+  if (!words.length) return shelfOrder(files.filter((f) => !f.hidden)).map((doc) => ({ doc, score: 0, title: new Set(), path: new Set() }));
   const hits: Hit[] = [];
   for (const doc of files) {
     const name = nameOf(doc.path);
@@ -126,23 +130,28 @@ function size(bytes: number): string {
   return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
 }
 
-function lastRead(floor: string): string | undefined {
+/** What's kept under `key` for `name` (a floor, or a floor's branch), from this browser. */
+function recall(key: string, name: string): string | undefined {
   try {
-    return JSON.parse(localStorage.getItem(LAST_KEY) ?? '{}')[floor];
+    const v = JSON.parse(localStorage.getItem(key) ?? '{}')[name];
+    return typeof v === 'string' ? v : undefined;
   } catch {
     return undefined;
   }
 }
 
-function rememberRead(floor: string, path: string) {
+function keep(key: string, name: string, value: string) {
   try {
-    const all = JSON.parse(localStorage.getItem(LAST_KEY) ?? '{}');
-    all[floor] = path;
-    localStorage.setItem(LAST_KEY, JSON.stringify(all));
+    const all = JSON.parse(localStorage.getItem(key) ?? '{}');
+    all[name] = value;
+    localStorage.setItem(key, JSON.stringify(all));
   } catch {
     // Private mode, or storage is full: it just won't reopen where you were.
   }
 }
+
+/** The doc you last read, on each floor and on each branch of it you read from. */
+const readKey = (floor: string, source: string) => (source ? `${floor}@${source}` : floor);
 
 async function getJson<T>(url: string): Promise<T> {
   const r = await fetch(url, { credentials: 'same-origin' });
@@ -152,7 +161,9 @@ async function getJson<T>(url: string): Promise<T> {
 
 export function openBookshelf(deps: ShelfDeps) {
   const { floor, repoUrl } = deps;
-  const q = (params: Record<string, string>) => new URLSearchParams({ floor, ...params }).toString();
+  /** The branch the shelf reads from ("" is the checkout), as you last picked it on this floor. */
+  let source = recall(SOURCE_KEY, floor) ?? '';
+  const q = (params: Record<string, string>) => new URLSearchParams({ floor, ...(source ? { source } : {}), ...params }).toString();
 
   const filter = h('input', { type: 'text', placeholder: 'Filter the docs…', 'aria-label': 'Filter the docs', spellcheck: 'false', autocomplete: 'off' }) as HTMLInputElement;
   const count = h('div.bs-count', {}, 'Looking along the shelves…');
@@ -174,10 +185,14 @@ export function openBookshelf(deps: ShelfDeps) {
     deps.onPageSound(pageSound);
     paintSound();
   });
+  const sourcePick = h('select.bs-source', { 'aria-label': 'Read the docs from', title: 'Read the docs from the checkout as it is, or from the branch on origin' }) as HTMLSelectElement;
+  sourcePick.hidden = true;
+  const homeBtn = h('button.btn.bs-home', { type: 'button', 'aria-label': 'Start page' }, '🏠');
+  homeBtn.hidden = true;
   const el = h(
     'div.modal.bookshelf',
     { role: 'dialog', 'aria-label': 'Bookshelf' },
-    h('header', {}, h('h2', {}, '📚 Bookshelf', deps.project ? h('span.bs-project', {}, ` · ${deps.project}`) : ''), soundBtn),
+    h('header', {}, h('h2', {}, '📚 Bookshelf', deps.project ? h('span.bs-project', {}, ` · ${deps.project}`) : ''), sourcePick, homeBtn, soundBtn),
     h(
       'div.body',
       {},
@@ -189,26 +204,36 @@ export function openBookshelf(deps: ShelfDeps) {
   page.append(h('div.bs-empty', {}, h('span.spinner')));
 
   let files: DocFile[] = [];
+  /** The doc .bookshelf.json opens first. */
+  let start: string | undefined;
   let shown: Hit[] = [];
   /** Which of `shown` ↑ ↓ are on. */
   let sel = 0;
   /** The doc open now, and each open's number, so a slow one that's been overtaken is dropped. */
   let current: string | null = null;
   let opening = 0;
+  /** Each listing's number, the same way: switching branches twice keeps the second. */
+  let loading = 0;
   /** Where the page was last time it turned (see the scroll listener). */
   let turnedAt = 0;
 
   const modal = openModal(el, { doing: '📚 at the bookshelf', reading: true });
 
   const renderList = () => {
-    count.textContent = !files.length ? '' : filter.value.trim() ? `${shown.length} of ${files.length} docs` : `${files.length} doc${files.length === 1 ? '' : 's'}`;
+    const hidden = files.filter((f) => f.hidden).length;
+    const onShelf = files.length - hidden;
+    count.textContent = !files.length
+      ? ''
+      : filter.value.trim()
+        ? `${shown.length} of ${files.length} docs`
+        : `${onShelf} doc${onShelf === 1 ? '' : 's'}${hidden ? ` · ${hidden} more when you filter` : ''}`;
     list.replaceChildren(
       ...shown.map((hit, i) => {
         const { doc } = hit;
         const title = doc.title ?? nameOf(doc.path);
         const li = h(
           'li.bs-item',
-          { role: 'option', 'aria-selected': String(i === sel), class: `${i === sel ? 'sel' : ''} ${doc.path === current ? 'open' : ''}`, title: doc.path },
+          { role: 'option', 'aria-selected': String(i === sel), class: `${i === sel ? 'sel' : ''} ${doc.path === current ? 'open' : ''} ${doc.hidden ? 'tucked' : ''}`, title: doc.path },
           h('div.bs-title', {}, ...(doc.title ? marked(title, hit.title) : marked(title, new Set([...hit.path].map((p) => p - (doc.path.length - title.length)))))),
           h('div.bs-path', {}, ...marked(doc.path, hit.path)),
         );
@@ -318,7 +343,7 @@ export function openBookshelf(deps: ShelfDeps) {
     }
     if (mine !== opening || !el.isConnected) return;
     current = path;
-    rememberRead(floor, path);
+    keep(LAST_KEY, readKey(floor, source), path);
     const info = files.find((f) => f.path === path);
     const body = doc.text.trim() ? markdownFile(doc.text) : h('div.md', {}, h('p.none', {}, 'This file is empty.'));
     wire(body, path);
@@ -357,21 +382,55 @@ export function openBookshelf(deps: ShelfDeps) {
     toc.value = '';
   });
 
+  const showSources = (sources: DocSource[]) => {
+    sourcePick.replaceChildren(...sources.map((x) => h('option', { value: x.ref }, x.label)));
+    sourcePick.value = source;
+    sourcePick.hidden = sources.length < 2;
+  };
+
+  /** Lists the shelf of `source` and opens the doc you last read there, else its start page. */
+  const load = () => {
+    const mine = ++loading;
+    count.textContent = 'Looking along the shelves…';
+    getJson<DocList>(`/api/docs?${q({})}`)
+      .then((r) => {
+        if (!el.isConnected || mine !== loading) return;
+        files = r.files;
+        start = r.start;
+        homeBtn.hidden = !start;
+        homeBtn.title = start ? `Back to the start page (${start})` : '';
+        showSources(r.sources);
+        refilter();
+        if (r.more) count.textContent += ` (the first ${files.length})`;
+        const first = [recall(LAST_KEY, readKey(floor, source)), start, ...shelfOrder(files.filter((f) => !f.hidden)).map((f) => f.path)].find((p) => p && files.some((f) => f.path === p));
+        if (first) void openDoc(first);
+        else page.replaceChildren(h('div.bs-empty', {}, '📭 Nothing to read here: this project has no Markdown files yet.'));
+      })
+      .catch((err: Error) => {
+        if (!el.isConnected || mine !== loading) return;
+        // A branch that's gone (or a source no longer offered): back to the checkout.
+        if (source) {
+          source = '';
+          keep(SOURCE_KEY, floor, source);
+          return load();
+        }
+        count.textContent = '';
+        page.replaceChildren(h('div.bs-empty', {}, `Couldn't look along the shelves: ${err.message}`));
+      });
+  };
+
+  sourcePick.addEventListener('change', () => {
+    source = sourcePick.value;
+    keep(SOURCE_KEY, floor, source);
+    current = null;
+    page.replaceChildren(h('div.bs-empty', {}, h('span.spinner')));
+    load();
+  });
+  homeBtn.addEventListener('click', () => {
+    if (start) void openDoc(start);
+  });
+
   // A moment later, so the E that opened the shelf isn't typed into the box.
   setTimeout(() => filter.focus(), 30);
-  getJson<DocList>(`/api/docs?${q({})}`)
-    .then((r) => {
-      if (!el.isConnected) return;
-      files = r.files;
-      refilter();
-      if (r.more) count.textContent += ` (the first ${files.length})`;
-      const start = [lastRead(floor), ...shelfOrder(files).map((f) => f.path)].find((p) => p && files.some((f) => f.path === p));
-      if (start) void openDoc(start);
-      else page.replaceChildren(h('div.bs-empty', {}, '📭 Nothing to read here: this project has no Markdown files yet.'));
-    })
-    .catch((err: Error) => {
-      if (!el.isConnected) return;
-      count.textContent = '';
-      page.replaceChildren(h('div.bs-empty', {}, `Couldn't look along the shelves: ${err.message}`));
-    });
+  load();
 }

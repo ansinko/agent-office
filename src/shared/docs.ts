@@ -8,8 +8,19 @@ export interface DocFile {
   /** Its first heading (or front matter title), when it has one near the top. */
   title?: string;
   size: number;
-  /** Last modified, ms since epoch. */
+  /** Last modified (on a branch: last committed), ms since epoch. */
   mtime: number;
+  /** The project's .bookshelf.json leaves it off the shelf until you filter for it. */
+  hidden?: boolean;
+}
+
+/**
+ * Where the shelf reads the project from: the checkout as it is on disk (ref ""), or a branch as
+ * git has it ("origin/main"), so the docs that merged can be read whatever the checkout is on.
+ */
+export interface DocSource {
+  ref: string;
+  label: string;
 }
 
 /** What GET /api/docs answers: every Markdown file in the floor's project, by path. */
@@ -17,6 +28,59 @@ export interface DocList {
   files: DocFile[];
   /** There were more than the office lists. */
   more: boolean;
+  /** The one these files are from, and the others it can read from. */
+  source: string;
+  sources: DocSource[];
+  /** The doc .bookshelf.json opens first, when it's on the shelf. */
+  start?: string;
+}
+
+/** The project's own say in its shelf: a file at the top of the project. */
+export const SHELF_CONFIG = '.bookshelf.json';
+
+export interface ShelfConfig {
+  /** The doc to open first, rather than the README. */
+  start?: string;
+  /** Globs of docs to leave off the list (`**` crosses folders, `*` doesn't, a trailing / is a folder). */
+  hide: string[];
+}
+
+/** .bookshelf.json, as far as it makes sense: anything it doesn't say, or says wrong, is left out. */
+export function parseShelfConfig(text: string | undefined): ShelfConfig {
+  let raw: unknown;
+  try {
+    raw = text ? JSON.parse(text) : undefined;
+  } catch {
+    raw = undefined;
+  }
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const start = typeof o.start === 'string' && isDocPath(o.start.replace(/^\.?\//, '')) ? o.start.replace(/^\.?\//, '') : undefined;
+  const hide = Array.isArray(o.hide) ? o.hide.filter((g): g is string => typeof g === 'string' && !!g.trim()).slice(0, 100) : [];
+  return { start, hide };
+}
+
+/** Whether `p` (from the project folder) matches the glob. A glob without a / matches at any depth. */
+export function globMatch(glob: string, p: string): boolean {
+  let g = glob.trim().replace(/^\.?\//, '');
+  if (g.endsWith('/')) g += '**';
+  if (!g.includes('/')) g = `**/${g}`;
+  let re = '';
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i];
+    if (c === '*' && g[i + 1] === '*') {
+      // "**/" is any folders, or none; a "**" elsewhere is anything at all.
+      if (g[i + 2] === '/') {
+        re += '(?:.*/)?';
+        i += 2;
+      } else {
+        re += '.*';
+        i += 1;
+      }
+    } else if (c === '*') re += '[^/]*';
+    else if (c === '?') re += '[^/]';
+    else re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${re}$`).test(p);
 }
 
 /** What GET /api/docs/file answers. */

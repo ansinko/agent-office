@@ -4,7 +4,8 @@ import path from 'node:path';
 import { insideCheckout } from './changes.js';
 import type { ImageResult } from './decor.js';
 import { changedImageType } from '../shared/protocol.js';
-import { isDocPath, type DocFile, type DocList, type DocText } from '../shared/docs.js';
+import { globMatch, isDocPath, parseShelfConfig, SHELF_CONFIG, type DocFile, type DocList, type DocText } from '../shared/docs.js';
+import { BranchShelf } from './docs-branch.js';
 
 // The bookshelf: every Markdown file in a floor's project, to read in the office (features/bookshelf/ui.ts).
 // Git says which files are the project's (tracked, or new and not ignored), so node_modules, build
@@ -24,6 +25,9 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'out', 'target', 've
 const MAX_DEPTH = 12;
 
 type Failure = { status: number; error: string };
+
+/** What a source has on its shelf, before .bookshelf.json has its say. */
+type Listing = { files: DocFile[]; more: boolean };
 
 /** The paths git lists, or undefined when the folder isn't in a git checkout (or there's no git). */
 function gitDocs(dir: string): Promise<string[] | undefined> {
@@ -110,21 +114,45 @@ async function head(file: string): Promise<string> {
 
 /** A floor's bookshelf: its project's Markdown files, and what's in them. */
 export class Docs {
-  private last: { at: number; list: DocList } | null = null;
-  private listing: Promise<DocList> | null = null;
+  private last: { at: number; list: Listing } | null = null;
+  private listing: Promise<Listing> | null = null;
   /** Titles by path, kept while the file's size and time stay the same. */
   private titles = new Map<string, { sig: string; title?: string }>();
+  /** The same shelf on origin's default branch (docs-branch.ts). */
+  private branch: BranchShelf;
 
-  constructor(private dir: string) {}
+  constructor(private dir: string) {
+    this.branch = new BranchShelf(dir, docTitle, HEAD_BYTES);
+  }
 
-  /** Every Markdown file in the project, by path. */
-  list(): Promise<DocList> {
+  /**
+   * Every Markdown file in the project, by path: in the checkout, or with `source` on the branch it
+   * names (one of the list's `sources`). The project's .bookshelf.json there picks the doc to open
+   * first and the docs to leave off the list.
+   */
+  async list(source = ''): Promise<DocList | Failure> {
+    const sources = await this.branch.sources();
+    if (!sources.some((s) => s.ref === source)) return { status: 404, error: "The bookshelf can't read from there" };
+    const found = source ? await this.branch.list(source, MAX_DOCS) : await this.checkout();
+    const config = parseShelfConfig(await this.configText(source));
+    const files = found.files.map((f) => (config.hide.some((g) => globMatch(g, f.path)) ? { ...f, hidden: true } : f));
+    const start = config.start && files.some((f) => f.path === config.start) ? config.start : undefined;
+    return { files, more: found.more, source, sources, start };
+  }
+
+  private async configText(source: string): Promise<string | undefined> {
+    if (!source) return readFile(path.join(this.dir, SHELF_CONFIG), 'utf8').catch(() => undefined);
+    const r = await this.branch.file(source, SHELF_CONFIG, HEAD_BYTES * 16).catch(() => undefined);
+    return Buffer.isBuffer(r) ? r.toString('utf8') : undefined;
+  }
+
+  private checkout(): Promise<Listing> {
     if (this.last && Date.now() - this.last.at < FRESH_MS) return Promise.resolve(this.last.list);
     this.listing ??= this.scan().finally(() => (this.listing = null));
     return this.listing;
   }
 
-  private async scan(): Promise<DocList> {
+  private async scan(): Promise<Listing> {
     const found = ((await gitDocs(this.dir)) ?? (await walkDocs(this.dir))).filter(isDocPath).map((p) => p.split(path.sep).join('/'));
     found.sort((a, b) => a.localeCompare(b));
     const more = found.length > MAX_DOCS;
@@ -159,8 +187,15 @@ export class Docs {
   }
 
   /** One doc's Markdown. Only Markdown, and only inside the project (not through a link out of it). */
-  async read(file: string): Promise<DocText | Failure> {
+  async read(file: string, source = ''): Promise<DocText | Failure> {
     if (!isDocPath(file)) return { status: 415, error: 'Only Markdown files are on the bookshelf' };
+    if (source) {
+      if (!(await this.branch.offers(source))) return { status: 404, error: "The bookshelf can't read from there" };
+      const r = await this.branch.doc(source, file, MAX_DOC_BYTES).catch(() => undefined);
+      if (!r) return { status: 404, error: `That file is not on ${source}` };
+      if ('tooBig' in r) return { status: 413, error: `That file is over ${MAX_DOC_BYTES / 1024 / 1024} MB` };
+      return { path: file, text: r.text };
+    }
     const abs = await insideCheckout(this.dir, file);
     if (!abs) return { status: 404, error: 'That file is not in the project' };
     try {
@@ -175,9 +210,16 @@ export class Docs {
   }
 
   /** A picture a doc shows, from the project. */
-  async picture(file: string): Promise<ImageResult> {
+  async picture(file: string, source = ''): Promise<ImageResult> {
     const type = changedImageType(file);
     if (!type) return { status: 415, error: 'Only pictures' };
+    if (source) {
+      if (!(await this.branch.offers(source)) || /(^|\/)\.\.?(\/|$)/.test(file)) return { status: 404, error: 'That file is not in the project' };
+      const r = await this.branch.file(source, file, MAX_PICTURE_BYTES).catch(() => undefined);
+      if (!r) return { status: 404, error: `That file is not on ${source}` };
+      if ('tooBig' in r) return { status: 413, error: `That picture is over ${MAX_PICTURE_BYTES / 1024 / 1024} MB` };
+      return { type, body: r };
+    }
     const abs = await insideCheckout(this.dir, file);
     if (!abs) return { status: 404, error: 'That file is not in the project' };
     try {

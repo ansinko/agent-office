@@ -115,15 +115,20 @@ export const fileRoutes = {
       const floor = floorParam(ctx, url);
       // The bookshelf: the project's Markdown files, one to read, and the pictures in it (see docs.ts).
       if (!floor) return send(res, 404, { error: 'No such floor' });
-      if (p === '/api/docs') return send(res, 200, await floor.docs.list());
+      // Which branch to read from: the checkout without it, else one of the list's sources.
+      const source = str(url.searchParams.get('source'), 200) ?? '';
+      if (p === '/api/docs') {
+        const r = await floor.docs.list(source);
+        return 'error' in r ? send(res, r.status, { error: r.error }) : send(res, 200, r);
+      }
       const file = str(url.searchParams.get('path'), 4096);
       if (!file) return send(res, 400, { error: 'Bad request' });
       if (p === '/api/docs/file') {
-        const r = await floor.docs.read(file);
+        const r = await floor.docs.read(file, source);
         return 'error' in r ? send(res, r.status, { error: r.error }) : send(res, 200, r);
       }
       if (p === '/api/docs/picture') {
-        const r = await floor.docs.picture(file);
+        const r = await floor.docs.picture(file, source);
         if ('error' in r) return send(res, r.status, { error: r.error });
         res.writeHead(200, {
           'content-type': r.type,

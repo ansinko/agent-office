@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Docs, docTitle } from '../src/server/docs.js';
-import { isDocPath, resolveDocLink } from '../src/shared/docs.js';
+import { globMatch, isDocPath, parseShelfConfig, resolveDocLink, type DocList } from '../src/shared/docs.js';
 
 /** A folder with some Markdown in it, and whatever `git` makes of it. */
 function fixture(t: { after(fn: () => void): void }, git: boolean) {
@@ -39,7 +39,7 @@ function fixture(t: { after(fn: () => void): void }, git: boolean) {
 
 test('the shelf is every Markdown file git counts as the project, with its title', async (t) => {
   const { docs } = fixture(t, true);
-  const { files, more } = await docs.list();
+  const { files, more } = listed(await docs.list());
   assert.equal(more, false);
   assert.deepEqual(
     files.map((f) => [f.path, f.title]),
@@ -55,7 +55,7 @@ test('the shelf is every Markdown file git counts as the project, with its title
 
 test('without git, the shelf walks the folder, skipping hidden and dependency folders', async (t) => {
   const { docs } = fixture(t, false);
-  const { files } = await docs.list();
+  const { files } = listed(await docs.list());
   assert.deepEqual(files.map((f) => f.path).sort(), ['docs/API.MD', 'docs/setup.markdown', 'ignored/secret.md', 'README.md'].sort());
 });
 
@@ -95,4 +95,102 @@ test('links in a doc resolve to paths in the project, and nowhere else', () => {
   for (const href of ['https://example.com/a.md', '//cdn/x.png', 'mailto:a@b.c', '../../etc/passwd', '..', '%E0%A4%A']) assert.equal(resolveDocLink('docs/a.md', href), undefined, href);
   assert.ok(isDocPath('a/b.MD') && isDocPath('x.markdown'));
   assert.ok(!isDocPath('a.mdx') && !isDocPath('../a.md') && !isDocPath('a/./b.md') && !isDocPath('md'));
+});
+
+test('.bookshelf.json globs: ** crosses folders, * stays in one, a bare name matches at any depth', () => {
+  assert.ok(globMatch('docs/plans/**', 'docs/plans/a/b.md'));
+  assert.ok(globMatch('docs/plans/', 'docs/plans/x.md'));
+  assert.ok(globMatch('**/test-cases/**', 'platform/svc/test-cases/01/a.md'));
+  assert.ok(globMatch('**/test-cases/**', 'test-cases/a.md'));
+  assert.ok(globMatch('CHANGELOG.md', 'pkg/CHANGELOG.md'));
+  assert.ok(globMatch('docs/*.md', 'docs/a.md'));
+  assert.ok(!globMatch('docs/*.md', 'docs/sub/a.md'));
+  assert.ok(!globMatch('docs/plans/**', 'docs/plans.md'));
+  assert.ok(!globMatch('a+b.md', 'aab.md'));
+  assert.deepEqual(parseShelfConfig('{"start":"./docs/README.md","hide":["docs/plans/**", 3, ""]}'), { start: 'docs/README.md', hide: ['docs/plans/**'] });
+  assert.deepEqual(parseShelfConfig('{"start":"../x.md"}'), { start: undefined, hide: [] });
+  assert.deepEqual(parseShelfConfig('not json'), { start: undefined, hide: [] });
+  assert.deepEqual(parseShelfConfig(undefined), { start: undefined, hide: [] });
+});
+
+/** A project cloned from an origin whose main has moved on since: the checkout is on a branch of its own. */
+function cloned(t: { after(fn: () => void): void }) {
+  const root = mkdtempSync(path.join(tmpdir(), 'office-docs-branch-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const sh = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, stdio: 'pipe' });
+  const put = (dir: string, file: string, text: string | Buffer) => {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), text);
+  };
+  const origin = path.join(root, 'origin.git');
+  const seed = path.join(root, 'seed');
+  mkdirSync(seed);
+  sh(root, 'init', '-q', '--bare', '-b', 'main', origin);
+  sh(seed, 'init', '-q', '-b', 'main');
+  put(seed, 'README.md', '# Project\n');
+  put(seed, 'docs/README.md', '# Start here\n');
+  put(seed, 'docs/plans/w1.md', '# Wave one\n');
+  put(seed, 'docs/pic.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  put(seed, '.bookshelf.json', '{"start":"docs/README.md","hide":["docs/plans/**"]}');
+  sh(seed, 'add', '.');
+  sh(seed, 'commit', '-qm', 'docs');
+  sh(seed, 'remote', 'add', 'origin', origin);
+  sh(seed, 'push', '-q', 'origin', 'main');
+  const dir = path.join(root, 'proj');
+  sh(root, 'clone', '-q', origin, dir);
+  sh(dir, 'checkout', '-q', '-b', 'feature/x');
+  put(dir, 'docs/feature.md', '# Only on the feature branch\n');
+  // Merged on origin after the clone: only a fetch brings it.
+  put(seed, 'docs/merged.md', '# Merged since\n');
+  sh(seed, 'add', '.');
+  sh(seed, 'commit', '-qm', 'more docs');
+  sh(seed, 'push', '-q', 'origin', 'main');
+  return { dir, docs: new Docs(dir) };
+}
+
+function listed(r: DocList | { error: string }): DocList {
+  assert.ok(!('error' in r), 'error' in r ? r.error : '');
+  return r as DocList;
+}
+
+test("the shelf reads origin's main as git has it, fetched, whatever the checkout is on", async (t) => {
+  const { docs } = cloned(t);
+  const here = listed(await docs.list());
+  assert.deepEqual(here.sources, [
+    { ref: '', label: 'This checkout · feature/x' },
+    { ref: 'origin/main', label: 'main on origin' },
+  ]);
+  assert.ok(here.files.some((f) => f.path === 'docs/feature.md'));
+  assert.ok(!here.files.some((f) => f.path === 'docs/merged.md'));
+
+  const main = listed(await docs.list('origin/main'));
+  assert.equal(main.source, 'origin/main');
+  assert.deepEqual(
+    main.files.map((f) => [f.path, f.title, f.hidden ?? false]),
+    [
+      ['docs/merged.md', 'Merged since', false],
+      ['docs/plans/w1.md', 'Wave one', true],
+      ['docs/README.md', 'Start here', false],
+      ['README.md', 'Project', false],
+    ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  );
+  assert.equal(main.start, 'docs/README.md');
+  assert.ok(main.files.every((f) => f.size > 0 && f.mtime > 0));
+
+  const doc = await docs.read('docs/merged.md', 'origin/main');
+  assert.ok('text' in doc && doc.text === '# Merged since\n');
+  assert.ok('error' in (await docs.read('docs/feature.md', 'origin/main')));
+  const pic = await docs.picture('docs/pic.png', 'origin/main');
+  assert.ok('body' in pic && pic.body.length === 4);
+  assert.ok('error' in (await docs.picture('../outside.png', 'origin/main')));
+});
+
+test('the shelf reads only from the sources it offers, never a ref a request names', async (t) => {
+  const { docs } = cloned(t);
+  for (const ref of ['feature/x', 'origin/feature/x', 'HEAD~1', '--output=/tmp/x', 'main']) {
+    const r = await docs.list(ref);
+    assert.ok('error' in r && r.status === 404, ref);
+    assert.ok('error' in (await docs.read('README.md', ref)), ref);
+    assert.ok('error' in (await docs.picture('docs/pic.png', ref)), ref);
+  }
 });

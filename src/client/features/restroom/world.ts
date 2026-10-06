@@ -130,6 +130,8 @@ function tiling(): THREE.Group {
 export interface Restroom {
   /** Someone sits on the toilet: the cubicle's sign goes red and its door stays shut. */
   setOccupied(on: boolean): void;
+  /** The face of the cork board on the inside of the cubicle door (see features/restroom/index.ts). */
+  doorBoard: THREE.Mesh;
 }
 
 declare module '../../world/types' {
@@ -151,6 +153,10 @@ export const restroom: Fixture<'restroom'> = (site) => {
   root.add(front.group, tiling());
   colliders.push(...front.colliders);
   site.doors.push(front.door);
+  // On the room's side of that wall, pictures keep off the doorway with its frame and the WC sign over it.
+  const d = RESTROOM.door;
+  site.wall('north', d.x, (d.height + 0.08) / 2, d.width + 0.16, d.height + 0.08);
+  site.wall('north', d.x, d.height + 0.4, 1, 0.5);
 
   const def = STATIONS.find((s) => s.id === RESTROOM_DESK)!;
   const table = attendantTable(def);
@@ -202,7 +208,7 @@ export const restroom: Fixture<'restroom'> = (site) => {
   return {
     group: root,
     interactables,
-    handle: { restroom: { setOccupied } },
+    handle: { restroom: { setOccupied, doorBoard: cubicle.doorBoard } },
     update: () => {
       if (wing.level > 0 !== shown) show(wing.level > 0);
     },

@@ -1,7 +1,8 @@
 /**
  * The restroom's toilet (SEATING's `restroom` seat): sitting there, E tells the hajzel baba an idea, which
- * hires her with it, and then opens her terminal. Getting up while she's at it ends the brainstorm,
- * once you've said so. The server holds everyone else to the same rule (server/restroom.ts).
+ * hires her with it, and then opens her terminal, and B opens the issues board, the one pinned inside the
+ * cubicle door. Getting up while she's at it ends the brainstorm, once you've said so. The server holds
+ * everyone else to the same rule (server/restroom.ts).
  */
 import { STATION_AGENT } from '../../../shared/layout';
 import { pressureNote } from '../../../shared/machine';
@@ -11,6 +12,7 @@ import type { Parts } from '../../core/parts';
 import { STATION_INFO } from '../../core/stations';
 import { store } from '../../state';
 import { toast } from '../../ui/dom';
+import { openBoard } from '../../ui/boards';
 import { confirmDialog, openPrompt } from '../../ui/prompt';
 
 export type ToiletParts = Pick<Parts, 'seating' | 'waiting' | 'actions'>;
@@ -69,6 +71,7 @@ export function installToilet(ctx: Ctx, parts: ToiletParts) {
       else if (what === 'terminal' && w) parts.waiting.openWorkerTerminal(w.id);
       else askForIdea(on);
     },
+    extra: { key: 'B', label: 'Issues board', use: () => openBoard('issues', net, parts.actions.boardActions()) },
     mayGetUp: (_seat, getUp) => {
       const w = baba();
       if (!w || !brainstorming(w.status)) return true;

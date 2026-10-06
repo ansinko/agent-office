@@ -1,8 +1,11 @@
 // The restroom (RESTROOM in layout.ts): who may talk to the hajzel baba at her table there. The server
 // holds everyone else to it (server/restroom.ts), and the page asks it before offering her.
 
-import { SEATING_BY_ID, seatAt } from './layout.js';
+import { RESTROOM, SEATING_BY_ID, seatAt, type Opening } from './layout.js';
 import type { WorkerStatus } from './protocol.js';
+
+/** The restroom's window in the building's east wall: high up, between the cubicle and the wall to the room. */
+export const RESTROOM_WINDOW: Opening = { wall: 'east', u: (RESTROOM.cubicle.maxZ + RESTROOM.maxZ - RESTROOM.wall) / 2, width: 1.3, y0: 1.7, y1: 3.1 };
 
 /** The hajzel baba's place (see STATIONS). */
 export const RESTROOM_DESK = 'station-restroom';

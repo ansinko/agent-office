@@ -7,7 +7,8 @@ import { seatable } from '../../world/office/seats';
 import type { Door } from '../../world/office/shell';
 
 // The cubicle in the restroom's north-east corner (RESTROOM.cubicle): two partitions on little feet,
-// a door in the south one with an occupied/free sign on it, and the toilet against the back wall.
+// a door in the south one with an occupied/free sign outside and a little issues board inside, and the
+// toilet against the back wall.
 
 const PANEL = '#7fb7be';
 const CHROME = '#c9d1d9';
@@ -21,6 +22,8 @@ export interface Cubicle {
   colliders: Collider[];
   interactables: Interactable[];
   door: Door;
+  /** The face of the cork board on the inside of the door, which the issues board's texture goes on. */
+  doorBoard: THREE.Mesh;
   /** The door's collider: in `colliders` only while someone sits on the toilet. */
   shut: Collider;
   /** Red and locked while someone sits on the toilet, green and swinging open for anyone otherwise. */
@@ -51,6 +54,20 @@ function occupiedSign(): { group: THREE.Group; set(on: boolean): void } {
   };
   set(false);
   return { group, set };
+}
+
+/**
+ * A cork board `width` by `height` in a thin wooden frame, facing -z: the inside of the door, seen
+ * from the toilet. `face` is its front, blank until a texture goes on it.
+ */
+function doorBoard(width: number, height: number): { group: THREE.Group; face: THREE.Mesh } {
+  const group = new THREE.Group();
+  group.add(mesh(roundedBox(width + 0.05, height + 0.05, 0.02, 0.01), toon('#b07a4a'), 0, 0, 0, false));
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+  face.position.z = -0.011;
+  face.rotation.y = Math.PI;
+  group.add(face);
+  return { group, face };
 }
 
 /** The toilet, facing +z: a pedestal and bowl, the seat ring with its lid up, and the cistern behind. */
@@ -125,6 +142,10 @@ export function buildCubicle(): Cubicle {
   const sign = occupiedSign();
   sign.group.position.set(-leafW + 0.27, 1.05 - GAP, W * 0.3 + 0.006);
   hinge.add(sign.group);
+  // The issues board on the inside, at the eyes of whoever sits on the toilet.
+  const board = doorBoard(0.66, 0.33);
+  board.group.position.set(-leafW / 2, 1.25 - GAP, -W * 0.3 - 0.01);
+  hinge.add(board.group);
   group.add(hinge);
   const door: Door = { x: cubicle.door.x, y: 0, z: cubicle.maxZ + 0.5, open: 0, show: (k) => (hinge.rotation.y = 1.5 * k * k * (3 - 2 * k)) };
   const shut: Collider = { minX: doorL, maxX: doorR, minZ: cubicle.maxZ - W / 2, maxZ: cubicle.maxZ + W / 2, top: H };
@@ -141,6 +162,7 @@ export function buildCubicle(): Cubicle {
     colliders,
     interactables,
     door,
+    doorBoard: board.face,
     shut,
     setOccupied(on) {
       sign.set(on);

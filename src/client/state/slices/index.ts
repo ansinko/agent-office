@@ -10,6 +10,7 @@
 import type { Slice } from '../store';
 import { building, floor, me, presence } from '../core';
 import { accounts } from './accounts';
+import { appScreen } from './appscreen';
 import { ball } from './ball';
 import { cabinet } from './cabinet';
 import { cars } from './cars';
@@ -61,4 +62,5 @@ export const SLICES: readonly Slice[] = [
   team,
   accounts,
   signins,
+  appScreen,
 ];

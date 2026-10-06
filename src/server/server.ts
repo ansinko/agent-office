@@ -57,6 +57,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
     ctx.cancelFloorsChanged();
     ctx.arcade.flush();
     ctx.upgrader.stop();
+    ctx.appScreen.stop();
     services.stop();
     tailnet.stop();
     ctx.webhook.stop();

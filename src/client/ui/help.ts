@@ -43,4 +43,5 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['Esc', 'Close any window and get back to looking around'],
   ['Ctrl + [', 'Send Esc to a terminal instead, to close a menu like Claude’s /skills or interrupt Claude. ⎋ Esc in the terminal’s header does the same'],
   ['⚙️', 'Settings (in the ☰ menu): switch between first and third person'],
+  ['🖥️', "The big screen in the meeting room shows a web page everyone sees, snapshotted live: an app the team keeps an eye on, the lunch menu. Press E at it to use the page itself, put up another of its saved pages with one click, or let them take turns. Admins add pages under ⚙️ Pages there"],
 ];

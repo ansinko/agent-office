@@ -17,6 +17,7 @@ import type { Ledger } from '../usage.js';
 import type { PlanLimitsReader } from '../limits.js';
 import type { Webhook } from '../webhook.js';
 import type { Machine } from '../machine.js';
+import type { AppScreen } from '../appscreen/index.js';
 import type { Building, FloorDef } from '../building.js';
 import type { Floor } from '../floor.js';
 import type { Sky } from '../sky.js';
@@ -70,6 +71,8 @@ export interface BuildingServices {
   accountLimits: Map<string, { key: string; reader: PlanLimitsReader }>;
   webhook: Webhook;
   machine: Machine;
+  /** The meeting room's screen: its pages, their snapshots and its window. */
+  appScreen: AppScreen;
   /** Whose plan `c` sees: their own, on an account with its own Claude sign-in; else the office's. */
   limitsOf(c: Client): PlanLimitsReader;
   /** Queues everywhere may be waiting for room under the worker limit: let them look again. */

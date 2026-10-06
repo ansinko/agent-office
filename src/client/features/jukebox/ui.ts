@@ -3,6 +3,7 @@ import { JUKEBOX_TUNES, STREAM, checkStreamUrl, trackTitle, tuneById } from '../
 import type { Net } from '../../net';
 import { store } from '../../state';
 import { h, openModal, toast } from '../../ui/dom';
+import { spotifySection } from './spotify';
 
 /** The jukebox: what's on, the tunes to pick from, skip and stop, and a box for a stream. */
 export function openJukebox(net: Net, openVolume: () => void) {
@@ -12,6 +13,7 @@ export function openJukebox(net: Net, openVolume: () => void) {
   const url = h('input', { type: 'text', placeholder: 'https://… internet radio, or a link to an .mp3', 'aria-label': 'Stream or audio file link', spellcheck: 'false', autocomplete: 'off' }) as HTMLInputElement;
   const playUrl = h('button.btn.primary', { type: 'button' }, '📻 Play');
   const volume = h('button.btn', { type: 'button' }, '🔈 Your volume');
+  const spotify = spotifySection(net);
   const el = h(
     'div.modal.jukebox',
     { role: 'dialog', 'aria-label': 'Jukebox' },
@@ -25,6 +27,7 @@ export function openJukebox(net: Net, openVolume: () => void) {
       h('label', { style: 'margin-top:16px' }, 'Or play a stream'),
       h('div.webhook', {}, url, playUrl),
       h('p.setting-note', {}, 'Internet radio or an audio file. It plays from the jukebox, for everyone on this floor.'),
+      spotify.el,
     ),
     h('footer', {}, h('span.grow', {}, 'Everyone on this floor hears the same song, louder the closer they are to the lounge.'), volume),
   );
@@ -83,7 +86,14 @@ export function openJukebox(net: Net, openVolume: () => void) {
     if (e.key === 'Enter') play();
   });
 
-  const modal = openModal(el, { doing: '🎵 at the jukebox', onClose: store.on('jukebox', render) });
+  const off = store.on('jukebox', render);
+  const modal = openModal(el, {
+    doing: '🎵 at the jukebox',
+    onClose: () => {
+      off();
+      spotify.stop();
+    },
+  });
   close.addEventListener('click', () => modal.close());
   volume.addEventListener('click', () => {
     modal.close();

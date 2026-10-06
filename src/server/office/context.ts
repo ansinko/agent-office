@@ -18,6 +18,7 @@ import type { PlanLimitsReader } from '../limits.js';
 import type { Webhook } from '../webhook.js';
 import type { Machine } from '../machine.js';
 import type { AppScreen } from '../appscreen/index.js';
+import type { Spotify } from '../spotify.js';
 import type { Building, FloorDef } from '../building.js';
 import type { Floor } from '../floor.js';
 import type { Sky } from '../sky.js';
@@ -73,6 +74,8 @@ export interface BuildingServices {
   machine: Machine;
   /** The meeting room's screen: its pages, their snapshots and its window. */
   appScreen: AppScreen;
+  /** The Spotify app on this machine, which the jukebox plays for admins. */
+  spotify: Spotify;
   /** Whose plan `c` sees: their own, on an account with its own Claude sign-in; else the office's. */
   limitsOf(c: Client): PlanLimitsReader;
   /** Queues everywhere may be waiting for room under the worker limit: let them look again. */

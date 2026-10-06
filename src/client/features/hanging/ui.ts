@@ -2,6 +2,7 @@ import './ui.css';
 import { FRAMES, checkImageUrl, type Decoration } from '../../../shared/decor';
 import { store } from '../../state';
 import { holdPicture, loadPicture, type Picture } from './world';
+import { filePicker, takeImages, uploadWallImage } from './upload';
 import { h, openModal, timeAgo } from '../../ui/dom';
 import { confirmDialog } from '../../ui/prompt';
 
@@ -21,7 +22,7 @@ function lastFrame(): number {
   }
 }
 
-const TIP = 'Paste a link to an image. Online, right-click any picture and choose “Copy image address”.';
+const TIP = 'Paste a link to an image (online, right-click any picture and choose “Copy image address”), or upload one of your own: pick it, drop it here or paste a screenshot.';
 
 /** Pick an image, a title and a frame. Editing a picture (`initial`) fills them in. */
 export function openHangDialog(opts: { initial?: Decoration; onDone(choice: HangChoice): void }) {
@@ -36,6 +37,8 @@ export function openHangDialog(opts: { initial?: Decoration; onDone(choice: Hang
   const status = h('p.hang-status', {}, TIP);
   const submit = h('button.btn.primary', { type: 'submit', disabled: true }, init ? 'Save' : 'Pick a spot on the wall →') as HTMLButtonElement;
   const cancel = h('button.btn', { type: 'button' }, 'Cancel');
+  const picker = filePicker((f) => void upload(f));
+  const uploadBtn = h('button.btn', { type: 'button', onclick: () => picker.click() }, '📁 Upload a picture');
   const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close' }, '✕');
   const form = h(
     'form.modal.hang',
@@ -45,7 +48,7 @@ export function openHangDialog(opts: { initial?: Decoration; onDone(choice: Hang
       'div.body',
       {},
       h('label', {}, 'Image link'),
-      urlIn,
+      h('div.hang-source', {}, urlIn, uploadBtn, picker),
       h('label', { style: 'margin-top:12px' }, 'Title'),
       titleIn,
       h('label', { style: 'margin-top:12px' }, 'Frame'),
@@ -115,6 +118,26 @@ export function openHangDialog(opts: { initial?: Decoration; onDone(choice: Hang
     }
   };
   let timer = 0;
+  const upload = async (file: File) => {
+    const my = ++seq;
+    submitWhenLoaded = false;
+    clearTimeout(timer);
+    pic = null;
+    submit.disabled = true;
+    release();
+    release = () => {};
+    preview.replaceChildren();
+    setStatus('Uploading the picture…', 'loading');
+    try {
+      const url = await uploadWallImage(file);
+      if (my !== seq) return;
+      urlIn.value = url;
+      void load();
+    } catch (err) {
+      if (my === seq) setStatus((err as Error).message, 'error');
+    }
+  };
+  const stopTaking = takeImages(form, (f) => void upload(f));
   urlIn.addEventListener('input', () => {
     submitWhenLoaded = false;
     clearTimeout(timer);
@@ -139,6 +162,7 @@ export function openHangDialog(opts: { initial?: Decoration; onDone(choice: Hang
     onClose: () => {
       seq++;
       clearTimeout(timer);
+      stopTaking();
       release();
     },
   });

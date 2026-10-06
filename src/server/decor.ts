@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { MAX_DECOR, checkImageUrl, sanitizePlacement, type Decoration } from '../shared/decor.js';
+import { isWallUrl } from '../shared/wall.js';
 
 /** The pictures on the office walls, saved in .agent-office/decor.json. */
 export class Decor {
@@ -84,7 +85,7 @@ const CACHE_MS = 30 * 60_000;
 const TIMEOUT_MS = 12_000;
 
 /** Recognizes common image formats from their first bytes, for hosts that don't say. */
-function sniff(b: Buffer): string | undefined {
+export function sniff(b: Buffer): string | undefined {
   const at = (i: number, s: string) => b.subarray(i, i + s.length).toString('latin1') === s;
   if (at(0, '\x89PNG')) return 'image/png';
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
@@ -106,6 +107,8 @@ export class ImageProxy {
   get(raw: string): Promise<ImageResult> {
     const checked = checkImageUrl(raw);
     if ('error' in checked) return Promise.resolve({ status: 400, error: checked.error });
+    // Uploaded pictures are the office's own, at /api/wall.
+    if (isWallUrl(checked.url)) return Promise.resolve({ status: 400, error: 'That picture is on the office already' });
     const url = checked.url;
     const hit = this.cache.get(url);
     if (hit && Date.now() - hit.at < CACHE_MS) {

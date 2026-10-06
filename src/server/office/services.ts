@@ -7,6 +7,7 @@ import { Team } from '../team.js';
 import { Upgrader } from '../upgrade.js';
 import { Services } from '../services.js';
 import { ImageProxy } from '../decor.js';
+import { WallStore } from '../wall.js';
 import { Ledger } from '../usage.js';
 import { PlanLimitsReader } from '../limits.js';
 import { Webhook } from '../webhook.js';
@@ -152,6 +153,9 @@ export function createLateServices(ctx: Ctx): LateServices {
   );
 
   const images = new ImageProxy();
+  // Pictures uploaded for the walls, shared by every floor (any floor's wall can show one).
+  const wall = new WallStore(cfg.dataDir, () => new Set([...floors.values()].flatMap((f) => f.decor.list().map((d) => d.url))));
+  wall.sweep();
 
   const upgrader = new Upgrader(
     (state) => ctx.broadcast({ t: 'upgrade', state }),
@@ -161,5 +165,5 @@ export function createLateServices(ctx: Ctx): LateServices {
       process.kill(process.pid, 'SIGTERM');
     },
   );
-  return { team, tailnet, services, images, upgrader, servicesState };
+  return { team, tailnet, services, images, wall, upgrader, servicesState };
 }

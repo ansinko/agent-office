@@ -86,13 +86,17 @@ export class HeadlessBrowser {
     const page = await (await context).newPage();
     try {
       let response = await page.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
+      // An app that checks its session in the browser shows its sign-in form only once it's asked.
+      await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => {});
       if (login?.user && login.password) {
         const password = page.locator('input[type=password]:visible').first();
         if (await password.count()) {
           const name = page.locator('input[type=email]:visible, input[type=text]:visible, input:not([type]):visible').first();
           if (await name.count()) await name.fill(login.user);
           await password.fill(login.password);
-          await Promise.all([page.waitForLoadState('load', { timeout: LOAD_TIMEOUT_MS }).catch(() => {}), password.press('Enter')]);
+          await password.press('Enter');
+          // A form that signs in with fetch stays up until the answer comes, and leaving earlier drops it.
+          await password.waitFor({ state: 'hidden', timeout: LOAD_TIMEOUT_MS }).catch(() => {});
           await page.waitForLoadState('networkidle', { timeout: SETTLE_MS }).catch(() => {});
           if (page.url() !== url) response = await page.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
         }

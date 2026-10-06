@@ -1,4 +1,4 @@
-import type { GhCloseReason, GhIssue, GhPull } from '../../../shared/protocol';
+import type { Choice, GhIssue, GhPull } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store, workerForPull } from '../../state';
 import { h, openModal } from '../dom';
@@ -7,21 +7,25 @@ import { refText } from './notes';
 
 // ---- Close dialog -------------------------------------------------------------------------------
 
-const REASON_LABEL: Record<GhCloseReason, string> = { completed: '✅ Completed', 'not planned': '🚫 Not planned' };
+/** What the host offers when closing: why an issue closes, and whether a PR's branch can go with it. */
+export interface CloseOptions {
+  reasons: Choice[];
+  deleteBranch: boolean;
+}
 
-/** Closes an issue (as completed or not planned) or a PR without merging, with an optional comment. */
-export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net, onClosed: () => void) {
+/** Closes an issue (for one of the tracker's reasons) or a PR without merging, with an optional comment. */
+export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net, onClosed: () => void, host: CloseOptions) {
   const ref = refTo(kind, it);
   const key = waitKey(ref);
   const pull = kind === 'pull' ? (it as GhPull) : null;
-  let reason: GhCloseReason = 'completed';
+  let reason = host.reasons[0]?.id;
   let busy = false;
 
   const go = h('button.btn.danger', { type: 'button' });
   const reasons = h('div.seg');
   const renderReasons = () => {
-    reasons.replaceChildren(...(Object.keys(REASON_LABEL) as GhCloseReason[]).map((r) => h('button.btn', { type: 'button', class: r === reason ? 'on' : '', onclick: () => ((reason = r), renderReasons()) }, REASON_LABEL[r])));
-    go.textContent = pull ? '🚫 Close pull request' : `${reason === 'completed' ? '✔️' : '🚫'} Close as ${reason}`;
+    reasons.replaceChildren(...host.reasons.map((r) => h('button.btn', { type: 'button', class: r.id === reason ? 'on' : '', onclick: () => ((reason = r.id), renderReasons()) }, r.label)));
+    go.textContent = pull ? '🚫 Close pull request' : !reason ? '✔️ Close issue' : `${reason === host.reasons[0].id ? '✔️' : '🚫'} Close as ${reason}`;
   };
   const comment = h('textarea', { rows: 4, placeholder: 'Leave a comment (optional)', 'aria-label': 'Closing comment' }) as HTMLTextAreaElement;
   const del = h('input', { type: 'checkbox', id: 'close-del' }) as HTMLInputElement;
@@ -38,10 +42,14 @@ export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net
       'div.body',
       {},
       h('p.gh-merge-title', {}, it.title, pull ? h('small', {}, `${pull.headRefName} → ${pull.baseRefName}`) : null),
-      pull
-        ? h('div.gh-status.muted', {}, h('span', {}, 'ℹ️'), `It won't be merged, and can be reopened on GitHub later.${w ? ` ${w.name} is still at a desk working on its branch.` : ''}`)
-        : h('label', {}, 'Why'),
-      pull ? h('label.gh-check', { for: 'close-del' }, del, `Delete ${pull.headRefName} too`) : reasons,
+      ...(pull
+        ? [
+            h('div.gh-status.muted', {}, h('span', {}, 'ℹ️'), `It won't be merged, and can be reopened on GitHub later.${w ? ` ${w.name} is still at a desk working on its branch.` : ''}`),
+            host.deleteBranch ? h('label.gh-check', { for: 'close-del' }, del, `Delete ${pull.headRefName} too`) : null,
+          ]
+        : host.reasons.length
+          ? [h('label', {}, 'Why'), reasons]
+          : []),
       comment,
       result,
     ),
@@ -69,7 +77,7 @@ export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net
       modal.close();
       onClosed();
     });
-    net.send({ t: 'gh.close', ...ref, comment: comment.value.trim() || undefined, reason: pull ? undefined : reason, deleteBranch: !!pull && del.checked });
+    net.send({ t: 'gh.close', ...ref, comment: comment.value.trim() || undefined, reason: pull ? undefined : reason, deleteBranch: !!pull && host.deleteBranch && del.checked });
   });
   setTimeout(() => comment.focus(), 30);
 }

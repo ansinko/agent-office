@@ -31,7 +31,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
   conv.append(h('div.gh-col', {}, thread, comment.el));
   // The footer stays put and renderFrame only shows, hides and relabels, so a board refresh never
   // pulls focus out of the provider picker.
-  const closeIssue = h('button.btn', { type: 'button', title: 'Close this issue on GitHub', onclick: () => openClose('issue', it, net, load) }, '✔️ Close issue…');
+  const closeIssue = h('button.btn', { type: 'button', title: 'Close this issue on GitHub', onclick: () => openClose('issue', it, net, load, { reasons: detail?.reasons ?? [], deleteBranch: false }) }, '✔️ Close issue…');
   const queueProvider = providerPicker(store.project, `issue-provider-${it.key}`, 'Queue on');
   const addIssueToQueue = () => {
     if (!queueProvider.valid()) return;
@@ -70,7 +70,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
         h('span', {}, `opened this ${timeAgo(it.createdAt)}`),
         it.assignees.length ? h('span', {}, `· 👤 ${it.assignees.join(', ')}`) : it.taken ? h('span', {}, '· 🤖 handed to a worker') : null,
         ...it.labels.map(labelChip),
-        labelButton('issue', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame())),
+        labelButton('issue', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame()), detail?.caps),
       ),
     );
     pill.className = `pill ${isOpen ? 'done' : 'offline'}`;

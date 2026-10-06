@@ -10,7 +10,7 @@ import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
 import { checksList, conflicted, mergeStatus, openMerge } from './merge';
 import { avatar, commentCard, errorBox, nodes, REVIEW_BADGE, REVIEWED_BADGE, spinnerRow, stateOf } from './pieces';
-import { FILES_KEY, mergePref, pref, savePref, TAB_KEY } from './prefs';
+import { deleteBranchPref, FILES_KEY, mergePref, pref, savePref, TAB_KEY } from './prefs';
 import { fixAndMergePrompt, fixConflictsPrompt, pullContext, pullVars, reviewPrompt, type BoardActions } from './prompts';
 import { buildTree, looksGenerated, parseDiff, renderFileDiff, renderThread, repliesOf, Reviewed, STATUS_WORD, treeOrder, type DiffFile, type TreeDir } from './pulldiff';
 
@@ -67,9 +67,10 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
   );
 
   const handToWorker = () => {
-    const p = mergePref(detail?.repo.methods ?? ['squash', 'merge', 'rebase']);
-    if (detail && conflicted(detail)) actions.assign(fixConflictsPrompt(it, p.method, p.deleteBranch), `Fix conflicts & merge PR #${it.number}`);
-    else actions.assign(fixAndMergePrompt(it, p.method, p.deleteBranch), `Fix up & merge PR #${it.number}`);
+    const method = mergePref(detail?.repo.methods ?? []);
+    const deleteBranch = deleteBranchPref() && (detail?.repo.caps.deleteBranch ?? true);
+    if (detail && conflicted(detail)) actions.assign(fixConflictsPrompt(it, method, deleteBranch), `Fix conflicts & merge PR #${it.number}`);
+    else actions.assign(fixAndMergePrompt(it, method, deleteBranch), `Fix up & merge PR #${it.number}`);
   };
 
   const renderFrame = () => {
@@ -89,7 +90,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
       h('code', {}, it.headRefName),
       h('span.gh-pm', {}, h('span.add', {}, `+${it.additions}`), ' ', h('span.del', {}, `−${it.deletions}`)),
       ...it.labels.map(labelChip),
-      labelButton('pull', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame())),
+      labelButton('pull', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame()), detail?.repo.caps),
       it.review !== 'none' ? h('span.gh-badge', { class: REVIEW_BADGE[it.review]?.[1] ?? '' }, it.review === 'pending' ? 'review required' : (REVIEW_BADGE[it.review]?.[0] ?? it.review)) : null,
       ),
     );
@@ -121,7 +122,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
         : isOpen
           ? h('button.btn', { type: 'button', title: 'A worker addresses the review comments, gets the checks green, then merges', onclick: handToWorker }, '🤖 Fix comments & merge')
           : null,
-      isOpen ? h('button.btn', { type: 'button', title: 'Close this pull request without merging it', onclick: () => openClose('pull', it, net, loadAll) }, '🚫 Close PR…') : null,
+      isOpen ? h('button.btn', { type: 'button', title: 'Close this pull request without merging it', onclick: () => openClose('pull', it, net, loadAll, { reasons: [], deleteBranch: detail?.repo.caps.deleteBranch ?? true }) }, '🚫 Close PR…') : null,
       isOpen ? merge : null,
       ),
     );
@@ -479,7 +480,8 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     getJson<GhPullDetail>(`/api/gh/pull?number=${it.number}`)
       .then((d) => {
         if (g !== generation) return;
-        detail = d;
+        // A host without line comments shows no threads, in the conversation or the diff.
+        detail = d.repo.caps.lineComments ? d : { ...d, reviewComments: [] };
         comment.setViewer(d.viewer);
         it = { ...it, state: d.state, review: d.review };
         // Line comments go into the diff, so draw it again with them.

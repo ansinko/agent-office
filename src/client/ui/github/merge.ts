@@ -1,8 +1,8 @@
-import type { GhCheck, GhMergeMethod, GhPull, GhPullDetail } from '../../../shared/protocol';
+import type { GhCheck, GhPull, GhPullDetail } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
 import { mergeWaiters } from './api';
-import { MERGE_KEY, mergePref, savePref } from './prefs';
+import { deleteBranchPref, MERGE_KEY, mergePref, savePref } from './prefs';
 
 // ---- Whether a PR can merge ---------------------------------------------------------------------
 
@@ -54,25 +54,26 @@ export function checksList(checks: GhCheck[]) {
 
 // ---- Merge dialog -------------------------------------------------------------------------------
 
-const METHOD_LABEL: Record<GhMergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' };
-
 export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: () => void, onMerged: () => void) {
   const st = mergeStatus(d);
-  const methods = d.repo.methods;
-  let { method, deleteBranch } = mergePref(methods);
+  const { methods, caps } = d.repo;
+  // Auto-merge is offered only where the host can merge once the requirements pass.
+  const canAuto = st.auto && caps.autoMerge;
+  let method = mergePref(methods);
+  let deleteBranch = deleteBranchPref();
   let busy = false;
 
   const methodBtns = h('div.seg');
   const go = h('button.btn.primary', { type: 'button' });
   const auto = h('input', { type: 'checkbox', id: 'merge-auto' }) as HTMLInputElement;
-  auto.checked = st.auto && st.cls !== 'ok';
+  auto.checked = canAuto && st.cls !== 'ok';
   const renderMethods = () => {
     methodBtns.replaceChildren(
       ...methods.map((m) =>
-        h('button.btn', { type: 'button', class: m === method ? 'on' : '', onclick: () => ((method = m), savePref(MERGE_KEY, { method, deleteBranch }), renderMethods()) }, METHOD_LABEL[m]),
+        h('button.btn', { type: 'button', class: m.id === method ? 'on' : '', onclick: () => ((method = m.id), savePref(MERGE_KEY, { method, deleteBranch }), renderMethods()) }, m.label),
       ),
     );
-    go.textContent = auto.checked ? '⏱ Merge when ready' : `🔀 ${METHOD_LABEL[method]}`;
+    go.textContent = auto.checked ? '⏱ Merge when ready' : `🔀 ${methods.find((m) => m.id === method)?.label ?? method}`;
   };
   auto.addEventListener('change', renderMethods);
   const del = h('input', { type: 'checkbox', id: 'merge-del' }) as HTMLInputElement;
@@ -100,8 +101,8 @@ export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: (
       d.checks.length ? checksList(d.checks) : null,
       h('label', { style: 'margin-top:14px' }, 'How'),
       methodBtns,
-      h('label.gh-check', { for: 'merge-del' }, del, `Delete ${it.headRefName} after merging`),
-      st.auto ? h('label.gh-check', { for: 'merge-auto', title: 'gh pr merge --auto (the repo must allow auto-merge)' }, auto, 'Merge automatically once the requirements pass') : null,
+      caps.deleteBranch ? h('label.gh-check', { for: 'merge-del' }, del, `Delete ${it.headRefName} after merging`) : null,
+      canAuto ? h('label.gh-check', { for: 'merge-auto', title: 'gh pr merge --auto (the repo must allow auto-merge)' }, auto, 'Merge automatically once the requirements pass') : null,
       result,
     ),
     h('footer', {}, st.can || conflicted(d) ? null : worker, h('span.grow'), cancel, conflicted(d) ? worker : go),
@@ -120,7 +121,7 @@ export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: (
     busy = true;
     go.disabled = true;
     result.className = 'gh-merge-result';
-    result.replaceChildren(h('span.spinner'), auto.checked && st.auto ? 'Asking GitHub to merge it when ready…' : 'Merging…');
+    result.replaceChildren(h('span.spinner'), auto.checked && canAuto ? 'Asking GitHub to merge it when ready…' : 'Merging…');
     mergeWaiters.set(it.number, (msg) => {
       mergeWaiters.delete(it.number);
       busy = false;
@@ -133,7 +134,7 @@ export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: (
       modal.close();
       onMerged();
     });
-    net.send({ t: 'gh.merge', number: it.number, method, deleteBranch, auto: auto.checked && st.auto });
+    net.send({ t: 'gh.merge', number: it.number, method, deleteBranch: deleteBranch && caps.deleteBranch, auto: auto.checked && canAuto });
   });
   setTimeout(() => (st.can ? go : cancel).focus(), 30);
 }

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
-import type { BoardRef, GhCheck, GhCloseReason, GhComment, GhIssue, GhIssueDetail, GhLabel, GhMergeMethod, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
-import { issueState, pullReview, pullState, readiness, reviewOf } from './hosts/github/map.js';
+import type { BoardRef, Choice, GhCheck, GhComment, GhIssue, GhIssueDetail, GhLabel, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
+import { GITHUB_CAPS, GITHUB_METHODS, GITHUB_REASONS, issueState, pullReview, pullState, readiness, reviewOf } from './hosts/github/map.js';
 import type { GhAs } from './signins.js';
 
 const REFRESH_MS = 90_000;
@@ -132,6 +132,15 @@ export class Claims {
   }
 }
 
+/** What `gh repo view` says each merge method needs switched on. */
+const ALLOWED: Record<string, string> = { squash: 'squashMergeAllowed', merge: 'mergeCommitAllowed', rebase: 'rebaseMergeAllowed' };
+
+/** The merge methods a repository allows, from `gh repo view`; all of them when it says none. */
+export function mergeMethods(r: Record<string, unknown>): Choice[] {
+  const methods = GITHUB_METHODS.filter((m) => r[ALLOWED[m.id]]);
+  return methods.length ? methods : GITHUB_METHODS;
+}
+
 /** What gh calls an issue or pull request on its command line: the issue's key, the PR's number. */
 const refArg = (ref: BoardRef): string => (ref.kind === 'issue' ? ref.key : String(ref.number));
 const itemArg = (it: GhIssue | GhPull): string => ('key' in it ? it.key : String(it.number));
@@ -168,12 +177,11 @@ export class GitHub {
     await Promise.all([this.refreshIssues(), this.refreshPulls()]);
   }
 
-  /** The repository's full name and how it lets PRs merge. Asked once (again after a failure). */
+  /** The repository's full name, how it lets PRs merge, and what GitHub can do. Asked once (again after a failure). */
   repoInfo(): Promise<GhRepoInfo> {
     this.repo ??= gh(['repo', 'view', '--json', 'nameWithOwner,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed'], this.dir).then((out) => {
       const r = JSON.parse(out);
-      const methods = (['squash', 'merge', 'rebase'] as const).filter((m) => r[{ squash: 'squashMergeAllowed', merge: 'mergeCommitAllowed', rebase: 'rebaseMergeAllowed' }[m]]);
-      return { nameWithOwner: String(r.nameWithOwner), methods: methods.length ? methods : ['squash', 'merge', 'rebase'] };
+      return { name: String(r.nameWithOwner), methods: mergeMethods(r), reasons: GITHUB_REASONS, caps: GITHUB_CAPS };
     });
     this.repo.catch(() => (this.repo = undefined));
     return this.repo;
@@ -243,7 +251,7 @@ export class GitHub {
   async issueDetail(key: string, me?: string): Promise<GhIssueDetail> {
     const [view, viewer] = await Promise.all([gh(['issue', 'view', key, '--json', 'number,state,body,comments'], this.dir), me ?? this.viewer()]);
     const i = JSON.parse(view);
-    return { key: String(i.number), state: i.state, body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer };
+    return { key: String(i.number), state: i.state, body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer, reasons: GITHUB_REASONS, caps: { labels: GITHUB_CAPS.labels } };
   }
 
   /**
@@ -278,12 +286,12 @@ export class GitHub {
   }
 
   /** Merges a PR, or with `auto` has GitHub merge it once its requirements pass. Returns an error. */
-  async merge(n: number, method: GhMergeMethod, deleteBranch: boolean, auto: boolean, as?: GhAs): Promise<string | undefined> {
+  async merge(n: number, method: string, deleteBranch: boolean, auto: boolean, as?: GhAs): Promise<string | undefined> {
     try {
       const repo = await this.repoInfo();
       // --repo keeps gh out of the office's own checkout: without it, --delete-branch also deletes
       // the local branch and switches the project folder over to the base branch.
-      const args = ['pr', 'merge', String(n), `--${method}`, '--repo', repo.nameWithOwner];
+      const args = ['pr', 'merge', String(n), `--${method}`, '--repo', repo.name];
       if (deleteBranch) args.push('--delete-branch');
       if (auto) args.push('--auto');
       await gh(args, this.dir, 90_000, as?.env);
@@ -295,13 +303,13 @@ export class GitHub {
   }
 
   /** Closes an issue, or a pull request without merging it, optionally saying why. Returns an error. */
-  async close(ref: BoardRef, opts: { comment?: string; reason?: GhCloseReason; deleteBranch?: boolean }, as?: GhAs): Promise<string | undefined> {
+  async close(ref: BoardRef, opts: { comment?: string; reason?: string; deleteBranch?: boolean }, as?: GhAs): Promise<string | undefined> {
     const { kind } = ref;
     const n = refArg(ref);
     try {
       const repo = await this.repoInfo();
       // --repo for the same reason as merge: --delete-branch must leave the office's checkout alone.
-      const args = [kind === 'issue' ? 'issue' : 'pr', 'close', n, '--repo', repo.nameWithOwner];
+      const args = [kind === 'issue' ? 'issue' : 'pr', 'close', n, '--repo', repo.name];
       // --flag=value, so a comment starting with "-" isn't read as a flag.
       if (opts.comment) args.push(`--comment=${opts.comment}`);
       if (kind === 'issue' && opts.reason) args.push(`--reason=${opts.reason}`);

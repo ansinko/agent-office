@@ -1,4 +1,4 @@
-import type { GhMergeMethod } from '../../../shared/protocol';
+import type { Choice } from '../../../shared/protocol';
 
 // What the windows remember in this browser: how you last merged, the Files tab's layout, which tab
 // you were on, and the comment you were writing.
@@ -26,11 +26,16 @@ export const TAB_KEY = 'agent-office.pr-tab';
 export const DRAFT_KEY = 'agent-office.comment:';
 
 interface MergePref {
-  method?: GhMergeMethod;
+  method?: string;
   deleteBranch?: boolean;
 }
 
-export function mergePref(methods: GhMergeMethod[]): { method: GhMergeMethod; deleteBranch: boolean } {
-  const p = pref<MergePref>(MERGE_KEY, {});
-  return { method: p.method && methods.includes(p.method) ? p.method : methods[0], deleteBranch: p.deleteBranch ?? true };
+/** The merge method you last picked when the repository offers it, else its first; before its list loads, the last you picked. */
+export function mergePref(methods: Choice[]): string {
+  const { method } = pref<MergePref>(MERGE_KEY, {});
+  if (!methods.length) return method ?? 'squash';
+  return methods.some((m) => m.id === method) ? method! : methods[0].id;
 }
+
+/** Whether you last left "delete the branch" ticked when merging. */
+export const deleteBranchPref = () => pref<MergePref>(MERGE_KEY, {}).deleteBranch ?? true;

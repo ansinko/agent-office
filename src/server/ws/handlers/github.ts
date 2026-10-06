@@ -30,20 +30,24 @@ export const githubHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const n = num(msg.number);
-    const method = (['squash', 'merge', 'rebase'] as const).find((m) => m === msg.method);
+    const method = str(msg.method, 40);
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !method) return;
-    ctx.withGitHub(
-      c,
-      (as) =>
-        void floor.github.merge(n, method, msg.deleteBranch === true, msg.auto === true, as).then((error) => {
-          ctx.sendTo(c, { t: 'gh.merged', number: n, error });
-          if (error) return;
-          ctx.toastFloor(floor, msg.auto ? `${who} set PR #${n} to merge once its checks pass` : `🎉 ${who} merged PR #${n}`);
-          // An auto-merge rings once GitHub gets round to it and the boards see it merged.
-          if (!msg.auto) floor.merged(n, who);
-        }),
-      (error) => ctx.sendTo(c, { t: 'gh.merged', number: n, error }),
-    );
+    const failed = (error: string) => ctx.sendTo(c, { t: 'gh.merged', number: n, error });
+    void floor.github.repoInfo().then((repo) => {
+      if (!repo.methods.some((m) => m.id === method)) return;
+      ctx.withGitHub(
+        c,
+        (as) =>
+          void floor.github.merge(n, method, msg.deleteBranch === true, msg.auto === true, as).then((error) => {
+            ctx.sendTo(c, { t: 'gh.merged', number: n, error });
+            if (error) return;
+            ctx.toastFloor(floor, msg.auto ? `${who} set PR #${n} to merge once its checks pass` : `🎉 ${who} merged PR #${n}`);
+            // An auto-merge rings once GitHub gets round to it and the boards see it merged.
+            if (!msg.auto) floor.merged(n, who);
+          }),
+        failed,
+      );
+    }, (err: Error) => failed(err.message));
   },
   'gh.comment'(ctx, c, msg) {
     const who = c.peer.name;
@@ -72,20 +76,24 @@ export const githubHandlers = {
     const floor = here(ctx, c);
     const ref = refOf(msg);
     if (!floor || !ref) return;
-    const reason = msg.reason === 'not planned' ? 'not planned' : 'completed';
-    ctx.withGitHub(
-      c,
-      (as) =>
-        void floor.github.close(ref, { comment: str(msg.comment, 20000).trim() || undefined, reason, deleteBranch: msg.deleteBranch === true }, as).then((error) => {
-          ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
-          if (error) return;
-          if (ref.kind === 'pull') return ctx.toastFloor(floor, `${who} closed ${named(ref)} without merging`);
-          // Nobody should be seated for an issue that's closed.
-          const dropped = floor.queue.dropIssue(ref.key);
-          ctx.toastFloor(floor, `${who} closed ${named(ref)}${reason === 'not planned' ? ' as not planned' : ''}${dropped ? ' and took it off the queue' : ''}`);
-        }),
-      (error) => ctx.sendTo(c, { t: 'gh.closed', ...ref, error }),
-    );
+    const failed = (error: string) => ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
+    void floor.github.repoInfo().then(({ reasons }) => {
+      // An issue closes for a reason the tracker lists, its first when none was picked.
+      const reason = reasons.find((r) => r.id === msg.reason)?.id ?? reasons[0]?.id;
+      ctx.withGitHub(
+        c,
+        (as) =>
+          void floor.github.close(ref, { comment: str(msg.comment, 20000).trim() || undefined, reason, deleteBranch: msg.deleteBranch === true }, as).then((error) => {
+            ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
+            if (error) return;
+            if (ref.kind === 'pull') return ctx.toastFloor(floor, `${who} closed ${named(ref)} without merging`);
+            // Nobody should be seated for an issue that's closed.
+            const dropped = floor.queue.dropIssue(ref.key);
+            ctx.toastFloor(floor, `${who} closed ${named(ref)}${reason === 'not planned' ? ' as not planned' : ''}${dropped ? ' and took it off the queue' : ''}`);
+          }),
+        failed,
+      );
+    }, (err: Error) => failed(err.message));
   },
   'gh.labels'(ctx, c, msg) {
     const who = c.peer.name;

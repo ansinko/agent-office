@@ -64,15 +64,32 @@ export interface GhState<T> {
   loading: boolean;
 }
 
-export type GhMergeMethod = 'squash' | 'merge' | 'rebase';
+/** A merge method's id, as the host takes it ("squash" on GitHub). */
+export type GhMergeMethod = string;
 
-/** Why an issue was closed, as GitHub records it. */
-export type GhCloseReason = 'completed' | 'not planned';
+/** Why an issue was closed: a close reason's id, as the tracker records it ("not planned" on GitHub). */
+export type GhCloseReason = string;
 
-/** How the repository lets pull requests be merged. */
+/** One of the ways the host offers to do something, and the words its button shows. */
+export interface Choice {
+  id: string;
+  label: string;
+}
+
+/** What the host can do beyond commenting, merging and closing; the windows hide what it can't. */
+export interface HostCaps {
+  labels: boolean;
+  autoMerge: boolean;
+  lineComments: boolean;
+  deleteBranch: boolean;
+}
+
+/** The repository's full name, how it lets pull requests merge, why its issues close, and what it can do. */
 export interface GhRepoInfo {
-  nameWithOwner: string;
-  methods: GhMergeMethod[];
+  name: string;
+  methods: Choice[];
+  reasons: Choice[];
+  caps: HostCaps;
 }
 
 /** A comment on an issue or on a PR's conversation, or a submitted review. */
@@ -135,6 +152,9 @@ export interface GhIssueDetail {
   comments: GhComment[];
   /** See GhPullDetail.viewer. */
   viewer: string;
+  /** Why the tracker lets an issue close. */
+  reasons: Choice[];
+  caps: Pick<HostCaps, 'labels'>;
 }
 
 /** GitHub turns away comments longer than this. */

@@ -1,5 +1,20 @@
 // GitHub's states, review decisions and merge states, in the office's own words.
-import type { IssueState, PullReview, PullState, Readiness } from '../../../shared/protocol.js';
+import type { Choice, HostCaps, IssueState, PullReview, PullState, Readiness } from '../../../shared/protocol.js';
+
+/** How GitHub merges a pull request, in the order its own merge button lists them. */
+export const GITHUB_METHODS: Choice[] = [
+  { id: 'squash', label: 'Squash and merge' },
+  { id: 'merge', label: 'Create a merge commit' },
+  { id: 'rebase', label: 'Rebase and merge' },
+];
+
+/** Why GitHub closes an issue; the ids are what `gh issue close --reason` takes. */
+export const GITHUB_REASONS: Choice[] = [
+  { id: 'completed', label: '✅ Completed' },
+  { id: 'not planned', label: '🚫 Not planned' },
+];
+
+export const GITHUB_CAPS: HostCaps = { labels: true, autoMerge: true, lineComments: true, deleteBranch: true };
 
 export function pullState(state: string, isDraft: boolean): PullState {
   const s = state.toUpperCase();

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Claims, MergeWatch } from '../src/server/github.js';
+import { Claims, MergeWatch, mergeMethods } from '../src/server/github.js';
 import type { GhIssue, GhPull } from '../src/shared/protocol.js';
 
 const pull = (number: number, state: GhPull['state']): GhPull => ({
@@ -79,4 +79,9 @@ test('claims are kept by issue key', () => {
   assert.equal(c.has('ERN-7'), true);
   answered(false);
   assert.equal(c.has('ERN-7'), false);
+});
+
+test('merge methods are the ones the repository allows, in GitHub order', () => {
+  assert.deepEqual(mergeMethods({ squashMergeAllowed: true, mergeCommitAllowed: false, rebaseMergeAllowed: true }).map((m) => m.id), ['squash', 'rebase']);
+  assert.deepEqual(mergeMethods({}).map((m) => m.id), ['squash', 'merge', 'rebase']);
 });

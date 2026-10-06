@@ -1,5 +1,5 @@
 import './windows.css';
-import type { GhIssue, GhLabel, GhPull } from '../../../shared/protocol';
+import type { GhIssue, GhLabel, GhPull, HostCaps } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
 import { repoUrlOf } from '../markdown';
@@ -151,8 +151,9 @@ export function openLabels(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Ne
   setTimeout(() => filter.focus(), 30);
 }
 
-/** The button that opens the label picker, after an issue's or PR's labels. */
-export function labelButton(kind: 'issue' | 'pull', it: () => GhIssue | GhPull, net: Net, onSaved: (labels: GhLabel[]) => void) {
+/** The button that opens the label picker, after an issue's or PR's labels; none where the host has no labels. */
+export function labelButton(kind: 'issue' | 'pull', it: () => GhIssue | GhPull, net: Net, onSaved: (labels: GhLabel[]) => void, caps?: Pick<HostCaps, 'labels'>) {
+  if (caps && !caps.labels) return null;
   const has = it().labels.length > 0;
   return h('button.btn.gh-label-edit', { type: 'button', title: 'Change the labels', 'aria-label': 'Change the labels', onclick: () => openLabels(kind, it(), net, onSaved) }, has ? '🏷️ Edit' : '🏷️ Add labels');
 }

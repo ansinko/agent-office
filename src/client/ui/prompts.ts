@@ -1,12 +1,14 @@
 import './prompts.css';
 import type { Net } from '../net';
 import { store } from '../state';
-import { PROMPTS, PROMPT_GROUPS, PROMPT_IDS, PROMPT_MAX, fillPrompt, placeholders, promptText, type PromptGroup, type PromptId, type PromptVars } from '../../shared/prompts';
+import { GITHUB_HOST, HOST_VARS, PROMPTS, PROMPT_GROUPS, PROMPT_IDS, PROMPT_MAX, placeholders, promptText, renderText, type PromptGroup, type PromptId, type PromptVars } from '../../shared/prompts';
 import { h, openModal, timeAgo } from './dom';
 
-/** One of the office's prompts, as it has it now (rewritten in ⚙️ Settings, or the default), filled in. */
+/** One of the office's prompts, as it has it now (rewritten in ⚙️ Settings, or the default), filled in with the floor's host's commands. */
 export function officePrompt(id: PromptId, vars: PromptVars = {}): string {
-  return fillPrompt(promptText(store.prompts.custom, id), vars);
+  const host = store.currentFloor()?.host;
+  const { cli, name } = host?.cli ? { cli: host.cli, name: host.name } : GITHUB_HOST;
+  return renderText(promptText(store.prompts.custom, id), vars, cli, name);
 }
 
 /** How many of the office's prompts someone rewrote. */
@@ -80,7 +82,7 @@ export function openPromptEditor(net: Net, first: PromptId = PROMPT_IDS[0]) {
     const inText = placeholders(ta.value);
     const lines: string[] = [];
     if (!ta.value.trim() && !def.optional) lines.push('It can’t be empty: write something, or put the default back.');
-    for (const name of inText) if (!(name in def.vars)) lines.push(`{{${name}}} isn’t filled in here, so it’s sent just as it’s written.`);
+    for (const name of inText) if (!(name in def.vars) && !(name in HOST_VARS)) lines.push(`{{${name}}} isn’t filled in here, so it’s sent just as it’s written.`);
     for (const name of def.needs ?? []) if (!inText.includes(name)) lines.push(`The office counts on {{${name}}} (${def.vars[name].toLowerCase()}): without it the worker isn’t told.`);
     warnings.replaceChildren(...lines.map((l) => h('p', {}, `⚠️ ${l}`)));
   };

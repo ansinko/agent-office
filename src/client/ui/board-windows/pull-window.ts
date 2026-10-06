@@ -1,5 +1,5 @@
 import './windows.css';
-import type { Pull, PullDetail, ReviewComment } from '../../../shared/protocol';
+import { mergeKey, type Pull, type PullDetail, type ReviewComment } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store, workerForPull } from '../../state';
 import { h, openModal, type Modal } from '../dom';
@@ -66,11 +66,13 @@ export function openPull(first: Pull, net: Net, actions: BoardActions) {
     h('footer', {}, h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`), footBtns),
   );
 
+  // The merge line comes with the PR's detail, so the buttons that call this wait for it.
   const handToWorker = () => {
-    const method = mergePref(detail?.repo.methods ?? []);
-    const deleteBranch = deleteBranchPref() && (detail?.repo.caps.deleteBranch ?? true);
-    if (detail && conflicted(detail)) actions.assign(fixConflictsPrompt(it, method, deleteBranch), `Fix conflicts & merge PR #${it.number}`);
-    else actions.assign(fixAndMergePrompt(it, method, deleteBranch), `Fix up & merge PR #${it.number}`);
+    if (!detail) return;
+    const deleteBranch = deleteBranchPref() && detail.repo.caps.deleteBranch;
+    const merge = detail.repo.mergeCommands?.[mergeKey(mergePref(detail.repo.methods), deleteBranch)] ?? '';
+    if (conflicted(detail)) actions.assign(fixConflictsPrompt(it, merge), `Fix conflicts & merge PR #${it.number}`);
+    else actions.assign(fixAndMergePrompt(it, merge), `Fix up & merge PR #${it.number}`);
   };
 
   const renderFrame = () => {
@@ -120,7 +122,7 @@ export function openPull(first: Pull, net: Net, actions: BoardActions) {
       conflicts
         ? h('button.btn.primary', { type: 'button', title: 'A new worker merges the base in, resolves the conflicts, gets the checks green, then merges', onclick: handToWorker }, '✨ Fix conflicts & merge')
         : isOpen
-          ? h('button.btn', { type: 'button', title: 'A worker addresses the review comments, gets the checks green, then merges', onclick: handToWorker }, '🤖 Fix comments & merge')
+          ? h('button.btn', { type: 'button', disabled: !detail, title: detail ? 'A worker addresses the review comments, gets the checks green, then merges' : 'Loading…', onclick: handToWorker }, '🤖 Fix comments & merge')
           : null,
       isOpen ? h('button.btn', { type: 'button', title: 'Close this pull request without merging it', onclick: () => openClose('pull', it, net, loadAll, { reasons: [], deleteBranch: detail?.repo.caps.deleteBranch ?? true }) }, '🚫 Close PR…') : null,
       isOpen ? merge : null,

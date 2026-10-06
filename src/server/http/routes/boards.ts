@@ -3,6 +3,7 @@ import { send } from '../util.js';
 import type { Route } from '../router.js';
 import { floorParam } from './files.js';
 import { issueKey } from '../../office/input.js';
+import { mergeKey } from '../../../shared/protocol.js';
 
 export const boardRoutes = {
   windows: {
@@ -21,7 +22,13 @@ export const boardRoutes = {
       try {
         // "You" on comments is your own GitHub login once you've signed in to it.
         const me = session.account ? ctx.signins.githubLogin(session.account.id) : undefined;
-        if (p === '/api/board/pull') return send(res, 200, await floor.host.pullDetail(n, me));
+        if (p === '/api/board/pull') {
+          const d = await floor.host.pullDetail(n, me);
+          // The merge line a worker is handed, for every method, keeping or deleting the branch.
+          const cli = floor.adapter?.cli;
+          const mergeCommands = cli && Object.fromEntries(d.repo.methods.flatMap((m) => [false, true].map((del) => [mergeKey(m.id, del), cli.merge(n, m.id, del, d.repo.name)])));
+          return send(res, 200, mergeCommands ? { ...d, repo: { ...d.repo, mergeCommands } } : d);
+        }
         if (p === '/api/board/issue' && key !== undefined) return send(res, 200, await floor.tracker.issueDetail(key, me));
         if (p === '/api/board/labels') return send(res, 200, await floor.tracker.repoLabels());
         if (p === '/api/board/pull/diff') {

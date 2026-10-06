@@ -84,7 +84,12 @@ export interface RepoInfo {
   methods: Choice[];
   reasons: Choice[];
   caps: HostCaps;
+  /** With a pull request's detail: the host's merge line for it, by mergeKey(method, deleteBranch), which the merge dialog hands a worker. */
+  mergeCommands?: Record<string, string>;
 }
+
+/** RepoInfo.mergeCommands' key for a merge method, keeping or deleting the branch. */
+export const mergeKey = (method: string, deleteBranch: boolean) => `${method}${deleteBranch ? ':delete' : ''}`;
 
 /** A comment on an issue or on a PR's conversation, or a submitted review. */
 export interface Comment {

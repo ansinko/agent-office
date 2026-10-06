@@ -13,22 +13,14 @@ import type {
   PullState,
   RepoInfo,
 } from '../../shared/protocol.js';
-import type { HostKind } from '../../shared/hosts.js';
+import type { HostCommands, HostKind } from '../../shared/hosts.js';
 import type { GhAs } from '../signins.js';
 
 /** Who a write runs as: someone's own sign-in, by its env. Undefined means the office's own. */
 export type HostAs = GhAs;
 
-/** The command lines agent prompts quote, as templates over the prompt's own {{placeholders}}. */
-export interface HostCli {
-  viewPull: string;
-  diffPull: string;
-  checkout: string;
-  checks: string;
-  lineComments: string;
-  createPr: string;
-  viewIssue: string;
-  listIssues: string;
+/** The command lines agent prompts quote, and the merge line the merge dialog hands a worker. */
+export interface HostCli extends HostCommands {
   /** The merge dialog's command for a method id, with or without deleting the branch, on `repo`. */
   merge(number: number, method: string, deleteBranch: boolean, repo: string): string;
 }

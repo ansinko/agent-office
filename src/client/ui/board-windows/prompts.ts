@@ -45,20 +45,17 @@ export function reviewPrompt(it: Pull) {
   return officePrompt('pull.review', pullVars(it));
 }
 
-function mergeCommand(it: Pull, method: string, deleteBranch: boolean) {
-  return `gh pr merge ${it.number} --${method}${deleteBranch ? ' --delete-branch' : ''} --repo ${nameWithOwner(it.url)}`;
+/** `merge` is the host's merge line for the method picked, from the PR's detail (RepoInfo.mergeCommands). */
+function mergeVars(it: Pull, merge: string) {
+  return { ...pullVars(it), repo: nameWithOwner(it.url), merge };
 }
 
-function mergeVars(it: Pull, method: string, deleteBranch: boolean) {
-  return { ...pullVars(it), repo: nameWithOwner(it.url), merge: mergeCommand(it, method, deleteBranch) };
+export function fixAndMergePrompt(it: Pull, merge: string) {
+  return officePrompt('pull.fixMerge', mergeVars(it, merge));
 }
 
-export function fixAndMergePrompt(it: Pull, method: string, deleteBranch: boolean) {
-  return officePrompt('pull.fixMerge', mergeVars(it, method, deleteBranch));
-}
-
-export function fixConflictsPrompt(it: Pull, method: string, deleteBranch: boolean) {
-  return officePrompt('pull.fixConflicts', mergeVars(it, method, deleteBranch));
+export function fixConflictsPrompt(it: Pull, merge: string) {
+  return officePrompt('pull.fixConflicts', mergeVars(it, merge));
 }
 
 export function pullContext(it: Pull) {

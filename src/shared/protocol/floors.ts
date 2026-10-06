@@ -8,7 +8,7 @@ import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
 import type { WhiteboardView } from '../whiteboard.js';
-import type { HostKind } from '../hosts.js';
+import type { HostCommands, HostKind } from '../hosts.js';
 import type { AgentProvider } from './agents.js';
 import type { AppScreenState } from './appscreen.js';
 import type { Issue, Pull, BoardState } from './boards.js';
@@ -38,8 +38,8 @@ export interface FloorInfo {
   name: string;
   /** owner/name on GitHub. */
   repo?: string;
-  /** Where its code is hosted, read off its origin; null when it has none the office knows. */
-  host: { kind: HostKind; name: string; repo: string; url: string } | null;
+  /** Where its code is hosted, read off its origin; null when it has none the office knows. `cli` is what its prompts quote, for a host the office reads. */
+  host: { kind: HostKind; name: string; repo: string; url: string; cli?: HostCommands } | null;
   /** Where its issues are tracked; null when it has no remote the office knows. */
   tracker: { kind: HostKind; name: string } | null;
   /** Its checkout on the office's machine. */

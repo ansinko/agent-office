@@ -12,7 +12,7 @@ import { adapterFor } from './hosts/registry.js';
 import { noHost } from './hosts/none.js';
 import { MergeWatch } from './hosts/watch.js';
 import type { CodeHost, HostAdapter, HostAs, Tracker } from './hosts/types.js';
-import { HOST_NAMES, type Remote } from '../shared/hosts.js';
+import { HOST_NAMES, commandsOf, type Remote } from '../shared/hosts.js';
 import { TaskQueue } from './queue.js';
 import { Changes } from './changes.js';
 import { Decor } from './decor.js';
@@ -29,7 +29,7 @@ import { Worktrees, type WorktreeCleanup } from './worktrees.js';
 import { landedWork, landedWorkers, type Landed } from './leave-on-merge.js';
 import type { Ledger } from './usage.js';
 import type { Capacity } from './machine.js';
-import { officePrompt, type PromptSource } from './prompts.js';
+import { floorPrompts, officePrompt, type PromptSource } from './prompts.js';
 
 type ToastLevel = 'info' | 'warn' | 'error';
 
@@ -165,6 +165,8 @@ export class Floor {
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
     this.jail = new Jail(dataDir);
+    // The office's prompts quote this floor's host's commands, once it knows its host (below).
+    const prompts = floorPrompts(ctx.prompts, () => this.adapter ?? undefined);
 
     // Before the workers, so it hears about the ones who wake up needing input.
     this.dog = new Dog(def.id, dataDir, {
@@ -209,7 +211,7 @@ export class Floor {
       },
       ctx.ledger,
       ctx.capacity,
-      ctx.prompts,
+      prompts,
       ctx.runAs,
       ctx.dshProfile,
     );
@@ -254,7 +256,7 @@ export class Floor {
         ctx.toast(this, '📋 The queue is empty: every task is done 🎉');
         ctx.emit(this, { t: 'gong', why: 'queue' });
       },
-      worktreeNote: () => officePrompt(ctx.prompts, 'queue.worktree'),
+      worktreeNote: () => officePrompt(prompts, 'queue.worktree'),
     });
 
     // Meetings seat their own workers round the meeting room's table and run them round by round.
@@ -282,7 +284,7 @@ export class Floor {
           const as = ctx.hostAs(owner);
           return typeof as === 'string' ? Promise.reject(new Error(as)) : this.host.review(pr, file, as);
         },
-        prompt: (id) => ctx.prompts.text(id),
+        prompts,
       },
     );
 
@@ -413,7 +415,7 @@ export class Floor {
       id: this.id,
       name: this.def.name,
       repo: this.def.repo,
-      host: r && name ? { kind: r.kind, name, repo: r.repo, url: r.url } : null,
+      host: r && name ? { kind: r.kind, name, repo: r.repo, url: r.url, ...(this.adapter ? { cli: commandsOf(this.adapter.cli) } : {}) } : null,
       tracker: r && name ? { kind: r.kind, name } : null,
       dir: this.dir,
       branch: this.project.branch,

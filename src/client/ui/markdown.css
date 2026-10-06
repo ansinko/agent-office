@@ -40,3 +40,7 @@
 .md .alert.important { border-color: #9d4edd; background: #f3e8ff; }
 .md .alert.warning { border-color: #e0a100; background: #fff6d6; }
 .md .alert.caution { border-color: #c3423f; background: #ffebee; }
+.md .mermaid-diagram { margin: 0 0 12px; padding: 12px; overflow-x: auto; text-align: center; background: #fff; border: 1px solid rgba(43, 45, 66, .12); border-radius: 8px; cursor: zoom-in; font-weight: 400; line-height: 1.5; overflow-wrap: normal; }
+.md .mermaid-diagram.full { cursor: zoom-out; text-align: left; }
+.md .mermaid-diagram svg { height: auto; }
+.md pre.mermaid-failed { border-left: 3px solid #e07a5f; }

@@ -4,7 +4,7 @@
 
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, Pull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
 import { isAgentEffort, isAgentProvider, issueKey } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { workerPr } from '../shared/status.js';
@@ -48,10 +48,10 @@ export interface WorkerRow {
 
 /** What a floor knows about its workers' pull requests. */
 export interface PullsView {
-  pulls: GhPull[];
+  pulls: Pull[];
   tasks: QueueTask[];
   /** Another floor's pull requests, for a worker across repositories. */
-  pullsOf?: (floor: string) => GhPull[] | undefined;
+  pullsOf?: (floor: string) => Pull[] | undefined;
 }
 
 /** How long a task or activity line gets. */

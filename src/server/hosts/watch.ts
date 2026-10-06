@@ -1,6 +1,6 @@
 // What a floor keeps track of on its boards, whatever the host: pull requests merging, and issues
 // workers have just taken.
-import type { GhIssue, GhPull } from '../../shared/protocol.js';
+import type { Issue, Pull } from '../../shared/protocol.js';
 
 /**
  * Spots pull requests that merged between two looks at the list, so the gong rings however they
@@ -20,7 +20,7 @@ export class MergeWatch {
   }
 
   /** A fresh list from the host: the pull requests that merged since the last look and haven't rung yet. */
-  look(pulls: GhPull[]): GhPull[] {
+  look(pulls: Pull[]): Pull[] {
     const open = this.open;
     const merged = open ? pulls.filter((p) => p.state === 'merged' && open.has(p.number) && !this.rang.has(p.number)) : [];
     // Once the host says it merged, it never shows as open again to ring twice.
@@ -58,7 +58,7 @@ export class Claims {
    * `items` with the taken ones marked. A list asked for (`asked`) before an issue was assigned doesn't
    * have its assignee yet, so it stays marked over it; one asked for after is believed, and the claim forgotten.
    */
-  mark(items: GhIssue[], asked = 0): GhIssue[] {
+  mark(items: Issue[], asked = 0): Issue[] {
     for (const [n, claim] of this.claimed) if (claim.at < asked) this.claimed.delete(n);
     return items.map(({ taken, ...it }) => (this.claimed.has(it.key) ? { ...it, taken: true } : it));
   }

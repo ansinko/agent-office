@@ -2,16 +2,16 @@
 // for issues, and the adapter that makes both for one kind of host (see registry.ts).
 import type {
   BoardRef,
+  BoardState,
   Choice,
-  GhComment as Comment,
-  GhIssue as Issue,
-  GhIssueDetail as IssueDetail,
-  GhLabel as Label,
-  GhPull as Pull,
-  GhPullDetail as PullDetail,
-  GhRepoInfo as RepoInfo,
-  GhState as BoardState,
+  Comment,
+  Issue,
+  IssueDetail,
+  Label,
+  Pull,
+  PullDetail,
   PullState,
+  RepoInfo,
 } from '../../shared/protocol.js';
 import type { HostKind } from '../../shared/hosts.js';
 import type { GhAs } from '../signins.js';

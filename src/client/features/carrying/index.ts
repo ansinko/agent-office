@@ -3,12 +3,12 @@
  * an empty desk, a worker, the queue, the meeting room or the herald hands it over; Q puts it back.
  * Which card you hold is the office's (ctx.carrying), since so much else looks at it.
  */
-import { issueRef, type AgentEffort, type AgentProvider, type CarriedIssue, type GhIssue, type WorkerInfo } from '../../../shared/protocol';
+import { issueRef, type AgentEffort, type AgentProvider, type CarriedIssue, type Issue, type WorkerInfo } from '../../../shared/protocol';
 import { isAsleep } from '../../../shared/status';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, key } from '../../core/hint';
 import { store } from '../../state';
-import { issuePrompt } from '../../ui/github/prompts';
+import { issuePrompt } from '../../ui/board-windows/prompts';
 import { closeAllModals, h, toast } from '../../ui/dom';
 import { issueMeeting, type MeetingPreset } from '../../ui/meeting';
 import { worktreePref } from '../../ui/prompt';
@@ -22,7 +22,7 @@ export interface CarryingDeps {
   /** The issues board, which leaves off the cards someone's carrying around (see features/boards). */
   boards: { cardMoved(): void };
   /** The note on the issues board you're pointing at, if any (see aimedNote in input/pointer.ts). */
-  aimedNote(): GhIssue | null;
+  aimedNote(): Issue | null;
   /** Plays the reach on your hands and your character, and shows it to everyone else. */
   reach(): void;
   /** Drops the ball, if it's in your hands (see features/basketball). */
@@ -51,7 +51,7 @@ export function installCarrying(ctx: Ctx, deps: CarryingDeps) {
   }
 
   /** ✋ in an issue's window, or E at its note on the board: its card comes off the board and into your hands. */
-  function pickUp(it: GhIssue) {
+  function pickUp(it: Issue) {
     closeAllModals();
     deps.dropBall();
     const carrying = ctx.carrying();
@@ -85,7 +85,7 @@ export function installCarrying(ctx: Ctx, deps: CarryingDeps) {
    * the issues board takes it back (or swaps it for the `note` you point at there). False when it's none
    * of those, so E does what it always does there.
    */
-  function dropCard(it: Interactable, card: CarriedIssue, note: GhIssue | null): boolean {
+  function dropCard(it: Interactable, card: CarriedIssue, note: Issue | null): boolean {
     if (it.kind === 'issues') {
       if (note) pickUp(note);
       else putBack();

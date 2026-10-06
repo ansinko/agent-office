@@ -1,5 +1,5 @@
 import './windows.css';
-import type { GhIssue, GhIssueDetail } from '../../../shared/protocol';
+import type { Issue, IssueDetail } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store } from '../../state';
 import { h, openModal, timeAgo } from '../dom';
@@ -9,15 +9,15 @@ import { getJson } from './api';
 import { openClose } from './close';
 import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
-import { avatar, commentCard, errorBox, nodes, spinnerRow } from './pieces';
+import { avatar, commentCard, errorBox, hostName, nodes, spinnerRow } from './pieces';
 import { issueContext, issuePrompt, type BoardActions } from './prompts';
 
 // ---- The issue window -----------------------------------------------------------------------------
 
-export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
+export function openIssue(first: Issue, net: Net, actions: BoardActions) {
   let it = first;
   const itemUrl = it.url;
-  let detail: GhIssueDetail | null = null;
+  let detail: IssueDetail | null = null;
   let error = '';
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const pill = h('span.pill');
@@ -51,7 +51,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
     h(
       'footer',
       {},
-      h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open on GitHub ↗'),
+      h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`),
       h('button.btn', { type: 'button', title: 'Send a worker your own prompt about this issue', onclick: () => actions.ask(issueContext(it), `Ask about issue ${it.ref}`) }, '✍️ Ask a worker…'),
       h('button.btn', { type: 'button', title: 'Workers take it on together in the meeting room: a debate, lead & team, map-reduce or red / blue', onclick: () => actions.meeting(issueMeeting(it.key, it.title)) }, '🤝 Meeting…'),
       closeIssue,
@@ -97,7 +97,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
     const g = ++generation;
     error = '';
     render();
-    getJson<GhIssueDetail>(`/api/gh/issue?key=${encodeURIComponent(it.key)}`)
+    getJson<IssueDetail>(`/api/board/issue?key=${encodeURIComponent(it.key)}`)
       .then((d) => {
         if (g !== generation) return;
         detail = d;

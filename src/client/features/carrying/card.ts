@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { issueRef, type CarriedIssue } from '../../../shared/protocol';
 import { NOTE_COLORS, PINS, wrap } from '../boards/world';
 import { toon, toonUnique } from '../../world/toon';
-import { keySeed } from '../../ui/github/notes';
+import { keySeed } from '../../ui/board-windows/notes';
 
 const W = 320;
 const H = 240;

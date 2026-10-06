@@ -1,4 +1,4 @@
-import type { BoardRef, GhIssue, GhPull, ServerMsg } from '../../../shared/protocol';
+import type { BoardRef, Issue, Pull, ServerMsg } from '../../../shared/protocol';
 import { store } from '../../state';
 
 // Talking to the office about GitHub: the reads (over HTTP, for the floor you're on), and the
@@ -22,24 +22,24 @@ export async function getText(url: string): Promise<string> {
 }
 
 /** The issue or PR `it` is, to name it to the office. */
-export function refTo(kind: 'issue' | 'pull', it: GhIssue | GhPull): BoardRef {
-  return kind === 'issue' ? { kind, key: (it as GhIssue).key } : { kind, number: (it as GhPull).number };
+export function refTo(kind: 'issue' | 'pull', it: Issue | Pull): BoardRef {
+  return kind === 'issue' ? { kind, key: (it as Issue).key } : { kind, number: (it as Pull).number };
 }
 
 /** What an open dialog waits under: "issue:KEY" or "pull:N". */
 export const waitKey = (ref: BoardRef): string => (ref.kind === 'issue' ? `issue:${ref.key}` : `pull:${ref.number}`);
 
-export const mergeWaiters = new Map<number, (msg: Extract<ServerMsg, { t: 'gh.merged' }>) => void>();
-export const commentWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.commented' }>) => void>();
+export const mergeWaiters = new Map<number, (msg: Extract<ServerMsg, { t: 'board.merged' }>) => void>();
+export const commentWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'board.commented' }>) => void>();
 /** Open close dialogs, by waitKey. */
-export const closeWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.closed' }>) => void>();
+export const closeWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'board.closed' }>) => void>();
 /** Open label pickers, by waitKey. */
-export const labelWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.labeled' }>) => void>();
+export const labelWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'board.labeled' }>) => void>();
 
 /** Main feeds server messages through here so an open merge, close or label dialog or comment box hears back. */
 export function routePullMessage(msg: ServerMsg) {
-  if (msg.t === 'gh.merged') mergeWaiters.get(msg.number)?.(msg);
-  if (msg.t === 'gh.commented') commentWaiters.get(waitKey(msg))?.(msg);
-  if (msg.t === 'gh.closed') closeWaiters.get(waitKey(msg))?.(msg);
-  if (msg.t === 'gh.labeled') labelWaiters.get(waitKey(msg))?.(msg);
+  if (msg.t === 'board.merged') mergeWaiters.get(msg.number)?.(msg);
+  if (msg.t === 'board.commented') commentWaiters.get(waitKey(msg))?.(msg);
+  if (msg.t === 'board.closed') closeWaiters.get(waitKey(msg))?.(msg);
+  if (msg.t === 'board.labeled') labelWaiters.get(waitKey(msg))?.(msg);
 }

@@ -1,10 +1,10 @@
-// The floor's GitHub boards: issues, pull requests, and what the office does to them.
+// The floor's boards: issues, pull requests, and what the office does to them.
 
 /** A GitHub label; `color` is a CSS color ("#d73a4a"). */
-export interface GhLabel {
+export interface Label {
   name: string;
   color: string;
-  /** What it's for, in the repo's list of labels (the label picker's /api/gh/labels). */
+  /** What it's for, in the repo's list of labels (the label picker's /api/board/labels). */
   description?: string;
 }
 
@@ -16,7 +16,7 @@ export type PullReview = 'approved' | 'changes' | 'pending' | 'none';
 export type Readiness = 'clean' | 'conflict' | 'behind' | 'blocked' | 'checks' | 'unknown';
 export type IssueState = 'open' | 'closed';
 
-export interface GhIssue {
+export interface Issue {
   /** What the tracker calls it: GitHub's issue number ("12"), or a key like "ERN-123". */
   key: string;
   /** How it's shown: "#12" on GitHub. */
@@ -25,7 +25,7 @@ export interface GhIssue {
   state: IssueState;
   url: string;
   author: string;
-  labels: GhLabel[];
+  labels: Label[];
   assignees: string[];
   /** A worker in the office just took it, so it's In progress on the board before GitHub lists its assignee. */
   taken?: boolean;
@@ -35,13 +35,13 @@ export interface GhIssue {
   comments: number;
 }
 
-export interface GhPull {
+export interface Pull {
   number: number;
   title: string;
   state: PullState;
   url: string;
   author: string;
-  labels: GhLabel[];
+  labels: Label[];
   review: PullReview;
   headRefName: string;
   /** The commit its branch is at on GitHub (for a merged PR, the last one merged). */
@@ -57,18 +57,12 @@ export interface GhPull {
   closes: string[];
 }
 
-export interface GhState<T> {
+export interface BoardState<T> {
   items: T[];
   error?: string;
   fetchedAt: number;
   loading: boolean;
 }
-
-/** A merge method's id, as the host takes it ("squash" on GitHub). */
-export type GhMergeMethod = string;
-
-/** Why an issue was closed: a close reason's id, as the tracker records it ("not planned" on GitHub). */
-export type GhCloseReason = string;
 
 /** One of the ways the host offers to do something, and the words its button shows. */
 export interface Choice {
@@ -85,7 +79,7 @@ export interface HostCaps {
 }
 
 /** The repository's full name, how it lets pull requests merge, why its issues close, and what it can do. */
-export interface GhRepoInfo {
+export interface RepoInfo {
   name: string;
   methods: Choice[];
   reasons: Choice[];
@@ -93,7 +87,7 @@ export interface GhRepoInfo {
 }
 
 /** A comment on an issue or on a PR's conversation, or a submitted review. */
-export interface GhComment {
+export interface Comment {
   id: string;
   author: string;
   body: string;
@@ -104,7 +98,7 @@ export interface GhComment {
 }
 
 /** A comment on a line of a PR's diff. */
-export interface GhReviewComment {
+export interface ReviewComment {
   id: number;
   /** The first comment of the thread this one answers. */
   replyTo?: number;
@@ -119,14 +113,14 @@ export interface GhReviewComment {
   side: 'LEFT' | 'RIGHT';
 }
 
-export interface GhCheck {
+export interface Check {
   name: string;
   state: 'pass' | 'fail' | 'pending' | 'skip';
   url?: string;
 }
 
-/** Everything the PR window shows beyond the board card: GET /api/gh/pull?number=N */
-export interface GhPullDetail {
+/** Everything the PR window shows beyond the board card: GET /api/board/pull?number=N */
+export interface PullDetail {
   number: number;
   body: string;
   state: PullState;
@@ -135,22 +129,22 @@ export interface GhPullDetail {
   baseRefName: string;
   readiness: Readiness;
   commits: number;
-  comments: GhComment[];
-  reviews: GhComment[];
-  reviewComments: GhReviewComment[];
-  checks: GhCheck[];
-  repo: GhRepoInfo;
+  comments: Comment[];
+  reviews: Comment[];
+  reviewComments: ReviewComment[];
+  checks: Check[];
+  repo: RepoInfo;
   /** Who gh is signed in as on the server, and so who comments from the office appear from ('' if unknown). */
   viewer: string;
 }
 
-/** GET /api/gh/issue?key=K */
-export interface GhIssueDetail {
+/** GET /api/board/issue?key=K */
+export interface IssueDetail {
   key: string;
   state: IssueState;
   body: string;
-  comments: GhComment[];
-  /** See GhPullDetail.viewer. */
+  comments: Comment[];
+  /** See PullDetail.viewer. */
   viewer: string;
   /** Why the tracker lets an issue close. */
   reasons: Choice[];
@@ -158,9 +152,9 @@ export interface GhIssueDetail {
 }
 
 /** GitHub turns away comments longer than this. */
-export const GH_COMMENT_MAX = 65536;
+export const COMMENT_MAX = 65536;
 /** Longer than any label name: GitHub stops at 50 characters, and JS counts an emoji as two. */
-export const GH_LABEL_MAX = 100;
+export const LABEL_MAX = 100;
 
 /** An issue's key from what was sent: a GitHub issue number (12, "12", "#12") or a tracker key like ERN-123. */
 export const issueKey = (v: unknown): string | undefined => {
@@ -174,25 +168,25 @@ export const issueRef = (key: string): string => (/^\d+$/.test(key) ? `#${key}` 
 /** An issue by its key, or a pull request by its number: what the office comments on, closes and labels. */
 export type BoardRef = { kind: 'issue'; key: string } | { kind: 'pull'; number: number };
 
-export type GitHubClientMsg =
-  | { t: 'gh.refresh' }
-  /** Merge a pull request; the answer comes back as gh.merged. */
-  | { t: 'gh.merge'; number: number; method: GhMergeMethod; deleteBranch: boolean; auto?: boolean }
-  /** Comment on an issue or a PR's conversation, as the server's gh account; answered with gh.commented. */
-  | ({ t: 'gh.comment'; body: string } & BoardRef)
-  /** Close an issue, or a pull request without merging it; the answer comes back as gh.closed. */
-  | ({ t: 'gh.close'; comment?: string; reason?: GhCloseReason; deleteBranch?: boolean } & BoardRef)
-  /** Put labels on an issue or PR and take others off, as the server's gh account; answered with gh.labeled. */
-  | ({ t: 'gh.labels'; add: string[]; remove: string[] } & BoardRef);
+export type BoardClientMsg =
+  | { t: 'board.refresh' }
+  /** Merge a pull request; the answer comes back as board.merged. */
+  | { t: 'board.merge'; number: number; method: string; deleteBranch: boolean; auto?: boolean }
+  /** Comment on an issue or a PR's conversation, as the server's gh account; answered with board.commented. */
+  | ({ t: 'board.comment'; body: string } & BoardRef)
+  /** Close an issue, or a pull request without merging it; the answer comes back as board.closed. */
+  | ({ t: 'board.close'; comment?: string; reason?: string; deleteBranch?: boolean } & BoardRef)
+  /** Put labels on an issue or PR and take others off, as the server's gh account; answered with board.labeled. */
+  | ({ t: 'board.labels'; add: string[]; remove: string[] } & BoardRef);
 
-export type GitHubServerMsg =
-  | { t: 'gh.issues'; state: GhState<GhIssue> }
-  | { t: 'gh.pulls'; state: GhState<GhPull> }
+export type BoardServerMsg =
+  | { t: 'board.issues'; state: BoardState<Issue> }
+  | { t: 'board.pulls'; state: BoardState<Pull> }
   /** Sent to whoever asked for the merge. */
-  | { t: 'gh.merged'; number: number; error?: string }
+  | { t: 'board.merged'; number: number; error?: string }
   /** Sent to whoever commented: the comment as GitHub saved it, or why it wasn't. */
-  | ({ t: 'gh.commented'; comment?: GhComment; error?: string } & BoardRef)
+  | ({ t: 'board.commented'; comment?: Comment; error?: string } & BoardRef)
   /** Sent to whoever asked to close it. */
-  | ({ t: 'gh.closed'; error?: string } & BoardRef)
+  | ({ t: 'board.closed'; error?: string } & BoardRef)
   /** Sent to whoever changed them: the labels it has now, or why they didn't change. */
-  | ({ t: 'gh.labeled'; labels?: GhLabel[]; error?: string } & BoardRef);
+  | ({ t: 'board.labeled'; labels?: Label[]; error?: string } & BoardRef);

@@ -1,7 +1,7 @@
 // The floor's task queue.
 
 import type { AgentEffort, AgentProvider } from './agents.js';
-import type { PullState } from './github.js';
+import type { PullState } from './boards.js';
 
 export type TaskStatus = 'queued' | 'running' | 'done';
 

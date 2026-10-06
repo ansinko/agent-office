@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { LeaveOnMerge, landedWorkers } from '../src/server/leave-on-merge.js';
 import { Worktrees } from '../src/server/worktrees.js';
-import type { GhPull, QueueTask, WorkerInfo, WorkerStatus } from '../src/shared/protocol.js';
+import type { Pull, QueueTask, WorkerInfo, WorkerStatus } from '../src/shared/protocol.js';
 
 function worker(id: string, status: WorkerStatus = 'done', more: Partial<WorkerInfo> = {}): WorkerInfo {
   return {
@@ -16,13 +16,13 @@ function worker(id: string, status: WorkerStatus = 'done', more: Partial<WorkerI
   };
 }
 
-const pull = (number: number, state: GhPull['state'], headRefName: string, headRefOid?: string): GhPull => ({
+const pull = (number: number, state: Pull['state'], headRefName: string, headRefOid?: string): Pull => ({
   number, title: `PR ${number}`, state, url: '', author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0,
   checks: 'none', body: '', closes: [],
 });
 
-const ids = (workers: WorkerInfo[], pulls: GhPull[], tasks: QueueTask[] = []) => landedWorkers(workers, pulls, tasks).map((l) => l.worker.id);
+const ids = (workers: WorkerInfo[], pulls: Pull[], tasks: QueueTask[] = []) => landedWorkers(workers, pulls, tasks).map((l) => l.worker.id);
 
 test('a worker at rest whose pull request merged goes, with the head of what merged', () => {
   const head = 'a'.repeat(40);

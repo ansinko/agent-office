@@ -1,6 +1,6 @@
 // The GitHub CLI and what it prints: the pieces GitHub's pull requests and issues share.
 import { execFile } from 'node:child_process';
-import type { GhCheck, GhComment, GhLabel, GhPull } from '../../../shared/protocol.js';
+import type { Check, Comment, Label, Pull } from '../../../shared/protocol.js';
 import { reviewOf } from './map.js';
 
 /** Turns gh's stderr into something a person standing at the board can act on. */
@@ -25,11 +25,11 @@ export function gh(args: string[], cwd: string, timeout = 30_000, env?: Record<s
   });
 }
 
-export function labels(raw: any[]): GhLabel[] {
+export function labels(raw: any[]): Label[] {
   return (raw ?? []).map((l) => ({ name: String(l.name), color: `#${l.color ?? '888888'}` }));
 }
 
-export function checksOf(rollup: any[]): GhPull['checks'] {
+export function checksOf(rollup: any[]): Pull['checks'] {
   if (!rollup?.length) return 'none';
   let pending = false;
   for (const c of rollup) {
@@ -45,10 +45,10 @@ export function checksOf(rollup: any[]): GhPull['checks'] {
 const FAILED = ['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'];
 
 /** One entry of statusCheckRollup: a CheckRun (Actions) or a StatusContext (other CI). */
-export function checkOf(c: any): GhCheck {
+export function checkOf(c: any): Check {
   const concl = String(c.conclusion ?? c.state ?? '').toUpperCase();
   const status = String(c.status ?? '').toUpperCase();
-  let state: GhCheck['state'] = 'pass';
+  let state: Check['state'] = 'pass';
   if (FAILED.includes(concl)) state = 'fail';
   else if ((status && status !== 'COMPLETED') || !concl || concl === 'PENDING' || concl === 'EXPECTED') state = 'pending';
   else if (['SKIPPED', 'NEUTRAL', 'STALE'].includes(concl)) state = 'skip';
@@ -56,7 +56,7 @@ export function checkOf(c: any): GhCheck {
   return { name: c.workflowName ? `${c.workflowName} / ${name}` : name, state, url: c.detailsUrl ?? c.targetUrl ?? undefined };
 }
 
-export function commentsOf(raw: any[]): GhComment[] {
+export function commentsOf(raw: any[]): Comment[] {
   return (raw ?? []).map((c: any) => ({
     id: String(c.id),
     author: c.author?.login ?? 'ghost',
@@ -71,7 +71,7 @@ export function commentsOf(raw: any[]): GhComment[] {
  * Comments on issue or pull request `n` (to GitHub a PR is an issue too), as `env` or else the
  * office. Resolves to the comment as GitHub saved it.
  */
-export async function postComment(dir: string, n: string, body: string, env?: Record<string, string>): Promise<GhComment> {
+export async function postComment(dir: string, n: string, body: string, env?: Record<string, string>): Promise<Comment> {
   // -f sends the body as a plain string: no @file reading, no {owner} filling in.
   const jq = '{id: .node_id, author: {login: .user.login}, body, createdAt: .created_at, url: .html_url}';
   const out = await gh(['api', '--method', 'POST', `repos/{owner}/{repo}/issues/${n}/comments`, '-f', `body=${body}`, '--jq', jq], dir, undefined, env);
@@ -82,10 +82,10 @@ export async function postComment(dir: string, n: string, body: string, env?: Re
  * Puts labels on issue or pull request `n` and takes others off (to GitHub a PR is an issue too), as
  * `env` or else the office. Resolves to the labels it has now.
  */
-export async function putLabels(dir: string, n: string, add: string[], remove: string[], env?: Record<string, string>): Promise<GhLabel[]> {
+export async function putLabels(dir: string, n: string, add: string[], remove: string[], env?: Record<string, string>): Promise<Label[]> {
   const path = `repos/{owner}/{repo}/issues/${n}/labels`;
   const jq = '[.[] | {name, color}]';
-  let now: GhLabel[] | undefined;
+  let now: Label[] | undefined;
   // -f labels[]=… sends a JSON array of plain strings: no @file reading, no {owner} filling in.
   if (add.length) now = labels(JSON.parse(await gh(['api', '--method', 'POST', path, ...add.flatMap((l) => ['-f', `labels[]=${l}`]), '--jq', jq], dir, undefined, env)));
   for (const l of remove) {
@@ -105,13 +105,13 @@ export async function putLabels(dir: string, n: string, add: string[], remove: s
  * change is believed, and the change forgotten.
  */
 export class Relabels {
-  private changed = new Map<string, { labels: GhLabel[]; at: number }>();
+  private changed = new Map<string, { labels: Label[]; at: number }>();
 
-  set(n: string, labels: GhLabel[], at: number) {
+  set(n: string, labels: Label[], at: number) {
     this.changed.set(n, { labels, at });
   }
 
-  over<T extends { labels: GhLabel[] }>(items: T[], idOf: (it: T) => string, asked: number): T[] {
+  over<T extends { labels: Label[] }>(items: T[], idOf: (it: T) => string, asked: number): T[] {
     return items.map((it) => {
       const n = idOf(it);
       const r = this.changed.get(n);

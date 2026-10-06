@@ -1,6 +1,6 @@
 // A floor's pull requests on GitHub, through the gh CLI: the board, the PR window, and the pull
 // requests workers open.
-import type { BoardRef, Choice, GhComment, GhLabel, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState, PullState } from '../../../shared/protocol.js';
+import type { BoardRef, Choice, Comment, Label, Pull, PullDetail, RepoInfo, ReviewComment, BoardState, PullState } from '../../../shared/protocol.js';
 import type { CodeHost, HostAs } from '../types.js';
 import { truncate } from '../../workers/util.js';
 import { GITHUB_CAPS, GITHUB_METHODS, GITHUB_REASONS, pullReview, pullState, readiness } from './map.js';
@@ -22,22 +22,22 @@ export function mergeMethods(r: Record<string, unknown>): Choice[] {
 }
 
 export class GitHubPulls implements CodeHost {
-  pulls: GhState<GhPull> = { items: [], fetchedAt: 0, loading: false };
-  private repo?: Promise<GhRepoInfo>;
+  pulls: BoardState<Pull> = { items: [], fetchedAt: 0, loading: false };
+  private repo?: Promise<RepoInfo>;
   private login?: Promise<string>;
-  private labelList?: { at: number; list: Promise<GhLabel[]> };
+  private labelList?: { at: number; list: Promise<Label[]> };
   /** Labels just changed from the office, by PR number. */
   private relabeled = new Relabels();
 
   constructor(
     private dir: string,
-    private onPulls: (s: GhState<GhPull>) => void,
+    private onPulls: (s: BoardState<Pull>) => void,
   ) {}
 
   stop() {}
 
   /** The repository's full name, how it lets PRs merge, and what GitHub can do. Asked once (again after a failure). */
-  repoInfo(): Promise<GhRepoInfo> {
+  repoInfo(): Promise<RepoInfo> {
     this.repo ??= gh(['repo', 'view', '--json', 'nameWithOwner,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed'], this.dir).then((out) => {
       const r = JSON.parse(out);
       return { name: String(r.nameWithOwner), methods: mergeMethods(r), reasons: GITHUB_REASONS, caps: GITHUB_CAPS };
@@ -57,7 +57,7 @@ export class GitHubPulls implements CodeHost {
    * A PR's description, conversation, line comments, checks and whether it can merge. `me` is the
    * GitHub login of whoever asked, when they're signed in to their own; else it's the office's.
    */
-  async pullDetail(n: number, me?: string): Promise<GhPullDetail> {
+  async pullDetail(n: number, me?: string): Promise<PullDetail> {
     const fields = 'number,body,state,isDraft,reviewDecision,headRefName,baseRefName,mergeable,mergeStateStatus,commits,comments,reviews,statusCheckRollup';
     const jq = '.[] | {id, in_reply_to_id, path, line, side, body, user: .user.login, created_at, html_url}';
     const [view, lines, repo, viewer] = await Promise.all([
@@ -68,7 +68,7 @@ export class GitHubPulls implements CodeHost {
     ]);
     const p = JSON.parse(view);
     const review = pullReview(p.reviewDecision ?? '');
-    const reviewComments: GhReviewComment[] = lines
+    const reviewComments: ReviewComment[] = lines
       .split('\n')
       .filter((l) => l.trim())
       .map((l) => JSON.parse(l))
@@ -113,8 +113,8 @@ export class GitHubPulls implements CodeHost {
   }
 
   /** Comments on a PR's conversation, as `as` or else the office. Returns the comment as GitHub saved it, or why it couldn't. */
-  async comment(ref: BoardRef & { kind: 'pull' }, body: string, as?: HostAs): Promise<{ comment?: GhComment; error?: string }> {
-    let comment: GhComment;
+  async comment(ref: BoardRef & { kind: 'pull' }, body: string, as?: HostAs): Promise<{ comment?: Comment; error?: string }> {
+    let comment: Comment;
     try {
       comment = await postComment(this.dir, String(ref.number), body, as?.env);
     } catch (err) {
@@ -174,7 +174,7 @@ export class GitHubPulls implements CodeHost {
   }
 
   /** Every label the repository has, for the label picker. Asked again after a minute (or a failure). */
-  repoLabels(): Promise<GhLabel[]> {
+  repoLabels(): Promise<Label[]> {
     if (!this.labelList || Date.now() - this.labelList.at > LABELS_MS) {
       const list = gh(['api', 'repos/{owner}/{repo}/labels?per_page=100', '--paginate', '--jq', '.[] | {name, color, description}'], this.dir).then((out) =>
         out
@@ -190,8 +190,8 @@ export class GitHubPulls implements CodeHost {
   }
 
   /** Puts labels on a PR and takes others off, as `as` or else the office. Returns the labels it has now, or why they didn't change. */
-  async setLabels(n: number, add: string[], remove: string[], as?: HostAs): Promise<{ labels?: GhLabel[]; error?: string }> {
-    let now: GhLabel[];
+  async setLabels(n: number, add: string[], remove: string[], as?: HostAs): Promise<{ labels?: Label[]; error?: string }> {
+    let now: Label[];
     try {
       now = await putLabels(this.dir, String(n), add, remove, as?.env);
     } catch (err) {
@@ -268,7 +268,7 @@ export class GitHubPulls implements CodeHost {
       // `--state closed` includes merged PRs; keep only the ones closed without merging.
       const seen = new Set<number>();
       const all = [...JSON.parse(open), ...JSON.parse(merged), ...JSON.parse(closed)].filter((p: any) => !seen.has(p.number) && seen.add(p.number));
-      const fetched: GhPull[] = all.map((p: any) => ({
+      const fetched: Pull[] = all.map((p: any) => ({
         number: p.number,
         title: p.title,
         state: pullState(p.state, !!p.isDraft),

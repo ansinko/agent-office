@@ -17,7 +17,7 @@ import { openTerminal, openTerminalFor, routeTerminalMessage } from './ui/termin
 import { openChanges, openChangesFor, routeChangesMessage } from './ui/changes';
 import { lostWorktreeDialog, openPrompt, routeWorktreeMessage, sendHomeDialog } from './ui/prompt';
 import { openBoard } from './ui/boards';
-import type { BoardActions } from './ui/github/prompts';
+import type { BoardActions } from './ui/board-windows/prompts';
 import { openPull, routePullMessage } from './ui/pull';
 import { openQueue } from './ui/queue';
 import { openAsk } from './ui/ask';

@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Claims, MergeWatch } from '../src/server/hosts/watch.js';
 import { mergeMethods } from '../src/server/hosts/github/pulls.js';
-import type { GhIssue, GhPull } from '../src/shared/protocol.js';
+import type { Issue, Pull } from '../src/shared/protocol.js';
 
-const pull = (number: number, state: GhPull['state']): GhPull => ({
+const pull = (number: number, state: Pull['state']): Pull => ({
   number, title: `PR ${number}`, state, url: '', author: '', labels: [], review: 'none',
   headRefName: `b${number}`, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0,
   checks: 'none', body: '', closes: [],
 });
-const numbers = (ps: GhPull[]) => ps.map((p) => p.number);
+const numbers = (ps: Pull[]) => ps.map((p) => p.number);
 
 test('a pull request that was open at the last look and is merged now rings once', () => {
   const w = new MergeWatch();
@@ -28,10 +28,10 @@ test('a merge from the PR window rings right away, and not again when GitHub cat
   assert.deepEqual(numbers(w.look([pull(5, 'merged'), pull(6, 'merged')])), [6]);
 });
 
-const issue = (number: number, assignees: string[] = []): GhIssue => ({
+const issue = (number: number, assignees: string[] = []): Issue => ({
   key: String(number), ref: `#${number}`, title: `Issue ${number}`, state: 'open', url: '', author: '', labels: [], assignees, createdAt: '', updatedAt: '', body: '', comments: 0,
 });
-const taken = (is: GhIssue[]) => is.filter((i) => i.taken).map((i) => Number(i.key));
+const taken = (is: Issue[]) => is.filter((i) => i.taken).map((i) => Number(i.key));
 
 test('an issue a worker took is marked at once, before GitHub has answered', () => {
   const c = new Claims();

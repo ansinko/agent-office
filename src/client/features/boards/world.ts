@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import type { GhIssue, GhPull, GhState, QueueState, QueueTask, ServiceInfo, WorkerInfo } from '../../../shared/protocol';
+import type { Issue, Pull, BoardState, QueueState, QueueTask, ServiceInfo, WorkerInfo } from '../../../shared/protocol';
 import { store, workerForPull } from '../../state';
-import { noteKey, noteSeed, refText } from '../../ui/github/notes';
+import { noteKey, noteSeed, refText } from '../../ui/board-windows/notes';
 
 export const NOTE_COLORS = ['#fff7b0', '#ffd6e0', '#caffbf', '#bde0fe', '#ffe5b4'];
 export const PINS = ['#ef476f', '#118ab2', '#06d6a0', '#ffd166'];
@@ -41,7 +41,7 @@ export class BoardTexture {
   private notes: DrawnNote[] = [];
   /** The note being reached for, drawn lifted off the cork (see lift). */
   private lifted: string | null = null;
-  private last: [GhState<GhIssue> | GhState<GhPull>, Map<string, WorkerInfo> | undefined] | null = null;
+  private last: [BoardState<Issue> | BoardState<Pull>, Map<string, WorkerInfo> | undefined] | null = null;
 
   constructor(private kind: 'issues' | 'pulls') {
     this.canvas.width = 1200;
@@ -82,7 +82,7 @@ export class BoardTexture {
   }
 
   /** `workers` lets PR notes name the desk they came from. */
-  render(state: GhState<GhIssue> | GhState<GhPull>, workers?: Map<string, WorkerInfo>) {
+  render(state: BoardState<Issue> | BoardState<Pull>, workers?: Map<string, WorkerInfo>) {
     this.last = [state, workers];
     this.notes = [];
     const g = this.ctx;
@@ -97,7 +97,7 @@ export class BoardTexture {
       g.fillStyle = rnd() > 0.5 ? 'rgba(120,70,30,.18)' : 'rgba(255,240,210,.18)';
       g.fillRect(rnd() * W, rnd() * H, 3, 3);
     }
-    const open = (state.items as (GhIssue | GhPull)[]).filter((i) => i.state === 'open' || i.state === 'draft');
+    const open = (state.items as (Issue | Pull)[]).filter((i) => i.state === 'open' || i.state === 'draft');
     if (!open.length) {
       const note = state.error ? `⚠️ ${state.error}` : state.loading && !state.fetchedAt ? 'Loading…' : this.kind === 'issues' ? 'No open issues 🎉' : 'No open PRs';
       g.font = '800 40px Nunito, ui-rounded, system-ui, sans-serif';
@@ -149,7 +149,7 @@ export class BoardTexture {
       }
       g.fillStyle = '#2b2d42';
       const fs = Math.round(22 * Math.min(scale, nh / 164));
-      const w = this.kind === 'pulls' && workers ? workerForPull(workers.values(), it as GhPull) : undefined;
+      const w = this.kind === 'pulls' && workers ? workerForPull(workers.values(), it as Pull) : undefined;
       const footer = w ? fs * 1.3 : 0;
       g.font = `900 ${Math.round(fs * 1.35)}px Nunito, ui-rounded, system-ui, sans-serif`;
       g.fillText(refText(it), -nw / 2 + 14, -nh / 2 + fs * 2);

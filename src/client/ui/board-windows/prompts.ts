@@ -1,4 +1,4 @@
-import type { AgentEffort, AgentProvider, GhIssue, GhMergeMethod, GhPull } from '../../../shared/protocol';
+import type { AgentEffort, AgentProvider, Issue, Pull } from '../../../shared/protocol';
 import { store } from '../../state';
 import { repoUrlOf } from '../markdown';
 import type { MeetingPreset } from '../meeting';
@@ -16,18 +16,18 @@ export interface BoardActions {
   /** Put an issue on the 📋 task queue; a worker is seated for it when there's room. */
   queue(prompt: string, title: string, issue: string, provider?: AgentProvider, model?: string, effort?: AgentEffort): void;
   /** Take the issue's card off the board, to carry to a desk or the queue (not on the 2D view, where there's nobody to carry it). */
-  pickUp?(issue: GhIssue): void;
+  pickUp?(issue: Issue): void;
   /** Call a meeting about it: the meeting room's form, filled in. */
   meeting(preset: MeetingPreset): void;
 }
 
 /** The task a worker gets for an issue, from the board, a carried card or the queue (the 'issue.work' prompt). */
-export function issuePrompt(it: Pick<GhIssue, 'key' | 'title'> & { url?: string }): string {
+export function issuePrompt(it: Pick<Issue, 'key' | 'title'> & { url?: string }): string {
   return officePrompt('issue.work', issueVars(it));
 }
 
 /** What an issue's prompts fill in ({{number}} is its key). A carried card has no URL, but the board usually knows it. */
-export function issueVars(it: Pick<GhIssue, 'key' | 'title'> & { url?: string }) {
+export function issueVars(it: Pick<Issue, 'key' | 'title'> & { url?: string }) {
   return { number: it.key, title: it.title, url: it.url ?? store.issues.items.find((i) => i.key === it.key)?.url ?? '' };
 }
 
@@ -37,34 +37,34 @@ function nameWithOwner(url: string): string {
 }
 
 /** What a pull request's prompts fill in. */
-export function pullVars(it: GhPull) {
+export function pullVars(it: Pull) {
   return { number: it.number, title: it.title, url: it.url, branch: it.headRefName, base: it.baseRefName };
 }
 
-export function reviewPrompt(it: GhPull) {
+export function reviewPrompt(it: Pull) {
   return officePrompt('pull.review', pullVars(it));
 }
 
-function mergeCommand(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
+function mergeCommand(it: Pull, method: string, deleteBranch: boolean) {
   return `gh pr merge ${it.number} --${method}${deleteBranch ? ' --delete-branch' : ''} --repo ${nameWithOwner(it.url)}`;
 }
 
-function mergeVars(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
+function mergeVars(it: Pull, method: string, deleteBranch: boolean) {
   return { ...pullVars(it), repo: nameWithOwner(it.url), merge: mergeCommand(it, method, deleteBranch) };
 }
 
-export function fixAndMergePrompt(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
+export function fixAndMergePrompt(it: Pull, method: string, deleteBranch: boolean) {
   return officePrompt('pull.fixMerge', mergeVars(it, method, deleteBranch));
 }
 
-export function fixConflictsPrompt(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
+export function fixConflictsPrompt(it: Pull, method: string, deleteBranch: boolean) {
   return officePrompt('pull.fixConflicts', mergeVars(it, method, deleteBranch));
 }
 
-export function pullContext(it: GhPull) {
+export function pullContext(it: Pull) {
   return officePrompt('pull.ask', pullVars(it));
 }
 
-export function issueContext(it: GhIssue) {
+export function issueContext(it: Issue) {
   return officePrompt('issue.ask', issueVars(it));
 }

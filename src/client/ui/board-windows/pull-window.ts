@@ -1,5 +1,5 @@
 import './windows.css';
-import type { GhPull, GhPullDetail, GhReviewComment } from '../../../shared/protocol';
+import type { Pull, PullDetail, ReviewComment } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store, workerForPull } from '../../state';
 import { h, openModal, type Modal } from '../dom';
@@ -9,7 +9,7 @@ import { openClose } from './close';
 import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
 import { checksList, conflicted, mergeStatus, openMerge } from './merge';
-import { avatar, commentCard, errorBox, nodes, REVIEW_BADGE, REVIEWED_BADGE, spinnerRow, stateOf } from './pieces';
+import { avatar, commentCard, errorBox, hostName, nodes, REVIEW_BADGE, REVIEWED_BADGE, spinnerRow, stateOf } from './pieces';
 import { deleteBranchPref, FILES_KEY, mergePref, pref, savePref, TAB_KEY } from './prefs';
 import { fixAndMergePrompt, fixConflictsPrompt, pullContext, pullVars, reviewPrompt, type BoardActions } from './prompts';
 import { buildTree, looksGenerated, parseDiff, renderFileDiff, renderThread, repliesOf, Reviewed, STATUS_WORD, treeOrder, type DiffFile, type TreeDir } from './pulldiff';
@@ -18,11 +18,11 @@ import { buildTree, looksGenerated, parseDiff, renderFileDiff, renderThread, rep
 // reviews, line comments, checks) with a Files tab for the diff, where you tick files off as
 // reviewed; from here you comment, label, merge or close it, or hand it to a worker to review, fix up and merge.
 
-export function openPull(first: GhPull, net: Net, actions: BoardActions) {
+export function openPull(first: Pull, net: Net, actions: BoardActions) {
   let it = first;
   const itemUrl = it.url;
   const reviewed = new Reviewed(it.url);
-  let detail: GhPullDetail | null = null;
+  let detail: PullDetail | null = null;
   let detailError = '';
   let files: DiffFile[] | null = null;
   let diffError = '';
@@ -63,7 +63,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     meta,
     h('nav.gh-tabs', { role: 'tablist' }, tabConv, tabFiles),
     h('div.gh-body', {}, conv, filesPane),
-    h('footer', {}, h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open on GitHub ↗'), footBtns),
+    h('footer', {}, h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`), footBtns),
   );
 
   const handToWorker = () => {
@@ -129,7 +129,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
   };
 
   // --- Conversation
-  const showInDiff = (c: GhReviewComment) => {
+  const showInDiff = (c: ReviewComment) => {
     setTab('files');
     requestAnimationFrame(() => revealLine(c.path, c.side, c.line));
   };
@@ -477,7 +477,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     detailError = '';
     diffError = '';
     renderConv();
-    getJson<GhPullDetail>(`/api/gh/pull?number=${it.number}`)
+    getJson<PullDetail>(`/api/board/pull?number=${it.number}`)
       .then((d) => {
         if (g !== generation) return;
         // A host without line comments shows no threads, in the conversation or the diff.
@@ -489,7 +489,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
       })
       .catch((err) => g === generation && (detailError = (err as Error).message))
       .finally(() => g === generation && (renderFrame(), renderConv()));
-    getText(`/api/gh/pull/diff?number=${it.number}`)
+    getText(`/api/board/pull/diff?number=${it.number}`)
       .then((text) => {
         if (g !== generation) return;
         files = parseDiff(text);
@@ -499,7 +499,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     renderFrame();
   }
   reload.addEventListener('click', () => {
-    net.send({ t: 'gh.refresh' });
+    net.send({ t: 'board.refresh' });
     loadAll();
   });
 

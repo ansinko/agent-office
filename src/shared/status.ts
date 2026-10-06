@@ -1,6 +1,6 @@
 // What a worker's status means, for the checks the server and the browser both make.
 
-import type { GhPull, QueueTask, WorkerInfo, WorkerStatus } from './protocol.js';
+import type { Pull, QueueTask, WorkerInfo, WorkerStatus } from './protocol.js';
 
 /** Its process isn't running: it exited, or came back asleep after a restart. R wakes it. */
 export function isAsleep(status: WorkerStatus): boolean {
@@ -31,7 +31,7 @@ export interface WorkerPr {
  * task, or one it opened itself, is open (one still open wins, e.g. a follow-up on the same branch), or merged, so it can be
  * sent home. Undefined when it has none, or only closed ones.
  */
-export function workerPr(w: WorkerInfo, pulls: GhPull[], tasks: QueueTask[]): WorkerPr | undefined {
+export function workerPr(w: WorkerInfo, pulls: Pull[], tasks: QueueTask[]): WorkerPr | undefined {
   const mine = new Set<number>();
   if (w.pr) mine.add(w.pr.number);
   for (const n of w.pastPrs ?? []) mine.add(n);

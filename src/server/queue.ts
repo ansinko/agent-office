@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { isAgentProvider, issueKey, issueRef, type AgentChoice, type AgentEffort, type AgentProvider, type GhPull, type PullState, type QueueState, type QueueTask, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
+import { isAgentProvider, issueKey, issueRef, type AgentChoice, type AgentEffort, type AgentProvider, type Pull, type PullState, type QueueState, type QueueTask, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { DESK_BY_ID, SEATS, nextFreeSeat } from '../shared/layout.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { savedEffort, savedModel, takesEffort, takesModel } from '../shared/providers.js';
@@ -195,7 +195,7 @@ export class TaskQueue {
   }
 
   /** Fresh pull requests from GitHub: link each task to the PR that closes its issue (or came from its branch). */
-  onPulls(pulls: GhPull[]) {
+  onPulls(pulls: Pull[]) {
     let changed = false;
     for (const t of this.tasks) {
       if (t.status === 'queued') continue;

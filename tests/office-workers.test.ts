@@ -11,7 +11,7 @@ import { TOOLS, UsageError, buildRequest, formatHome, formatLinked, formatWorker
 import { codexMcpArgs, findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow } from '../src/server/office-workers.js';
 import { HOSTS } from '../src/server/hosts/registry.js';
 import { notLeaving } from '../src/server/leave-on-merge.js';
-import type { GhPull, WorkerInfo } from '../src/shared/protocol.js';
+import type { Pull, WorkerInfo } from '../src/shared/protocol.js';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'office-workers.js');
 const ENV = { AGENT_OFFICE_HOOK_URL: 'http://127.0.0.1:4455/', AGENT_OFFICE_WORKER_ID: 'w1', AGENT_OFFICE_HOOK_TOKEN: 'tok' };
@@ -25,7 +25,7 @@ function worker(id: string, more: Partial<WorkerInfo> = {}): WorkerInfo {
   };
 }
 
-const pull = (number: number, state: GhPull['state'], headRefName: string, headRefOid?: string): GhPull => ({
+const pull = (number: number, state: Pull['state'], headRefName: string, headRefOid?: string): Pull => ({
   number, title: `PR ${number}`, state, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0, checks: 'none', body: '', closes: [],
 });

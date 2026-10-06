@@ -1,7 +1,7 @@
 // The floor's boards: refreshing them, and merging, commenting on, closing and labeling issues (on
 // its tracker) and pull requests (on its host), as whoever asks (see withHost).
-import type { BoardRef, GitHubClientMsg } from '../../../shared/protocol.js';
-import { GH_COMMENT_MAX, GH_LABEL_MAX, issueRef } from '../../../shared/protocol.js';
+import type { BoardRef, BoardClientMsg } from '../../../shared/protocol.js';
+import { COMMENT_MAX, LABEL_MAX, issueRef } from '../../../shared/protocol.js';
 import { issueKey, num, str } from '../../office/input.js';
 import { here } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
@@ -22,24 +22,24 @@ function refOf(msg: { kind?: unknown; key?: unknown; number?: unknown }): BoardR
 /** "PR #9" or "issue #12" (a tracker's "issue ERN-7"), for toasts. */
 const named = (ref: BoardRef) => (ref.kind === 'pull' ? `PR #${ref.number}` : `issue ${issueRef(ref.key)}`);
 
-export const githubHandlers = {
-  'gh.refresh'(ctx, c) {
+export const boardHandlers = {
+  'board.refresh'(ctx, c) {
     void ctx.floorOf(c)?.refreshBoards();
   },
-  'gh.merge'(ctx, c, msg) {
+  'board.merge'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const n = num(msg.number);
     const method = str(msg.method, 40);
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !method) return;
-    const failed = (error: string) => ctx.sendTo(c, { t: 'gh.merged', number: n, error });
+    const failed = (error: string) => ctx.sendTo(c, { t: 'board.merged', number: n, error });
     void floor.host.repoInfo().then((repo) => {
       if (!repo.methods.some((m) => m.id === method)) return;
       ctx.withHost(
         c,
         (as) =>
           void floor.host.merge(n, method, msg.deleteBranch === true, msg.auto === true, as).then((error) => {
-            ctx.sendTo(c, { t: 'gh.merged', number: n, error });
+            ctx.sendTo(c, { t: 'board.merged', number: n, error });
             if (error) return;
             ctx.toastFloor(floor, msg.auto ? `${who} set PR #${n} to merge once its checks pass` : `🎉 ${who} merged PR #${n}`);
             // An auto-merge rings once GitHub gets round to it and the boards see it merged.
@@ -49,34 +49,34 @@ export const githubHandlers = {
       );
     }, (err: Error) => failed(err.message));
   },
-  'gh.comment'(ctx, c, msg) {
+  'board.comment'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const ref = refOf(msg);
     if (!floor || !ref) return;
     const body = typeof msg.body === 'string' ? msg.body : '';
     // Refused rather than cut short: a comment that silently lost its end would read as finished.
-    const invalid = !body.trim() ? 'The comment is empty' : body.length > GH_COMMENT_MAX ? `GitHub takes comments of up to ${GH_COMMENT_MAX} characters` : '';
+    const invalid = !body.trim() ? 'The comment is empty' : body.length > COMMENT_MAX ? `GitHub takes comments of up to ${COMMENT_MAX} characters` : '';
     if (invalid) {
-      ctx.sendTo(c, { t: 'gh.commented', ...ref, error: invalid });
+      ctx.sendTo(c, { t: 'board.commented', ...ref, error: invalid });
       return;
     }
     ctx.withHost(
       c,
       (as) =>
         void (ref.kind === 'issue' ? floor.tracker.comment(ref, body, as) : floor.host.comment(ref, body, as)).then((r) => {
-          ctx.sendTo(c, { t: 'gh.commented', ...ref, ...r });
+          ctx.sendTo(c, { t: 'board.commented', ...ref, ...r });
           if (r.comment) ctx.toastFloor(floor, `💬 ${who} commented on ${named(ref)}`);
         }),
-      (error) => ctx.sendTo(c, { t: 'gh.commented', ...ref, error }),
+      (error) => ctx.sendTo(c, { t: 'board.commented', ...ref, error }),
     );
   },
-  'gh.close'(ctx, c, msg) {
+  'board.close'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const ref = refOf(msg);
     if (!floor || !ref) return;
-    const failed = (error: string) => ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
+    const failed = (error: string) => ctx.sendTo(c, { t: 'board.closed', ...ref, error });
     // An issue's reasons come from its tracker; a pull request's close needs the host's repository info anyway.
     const listed = ref.kind === 'issue' ? floor.tracker.reasons() : floor.host.repoInfo().then((r) => r.reasons);
     void listed.then((reasons) => {
@@ -87,7 +87,7 @@ export const githubHandlers = {
         c,
         (as) =>
           void (ref.kind === 'issue' ? floor.tracker.close(ref.key, { comment, reason }, as) : floor.host.close(ref.number, { comment, deleteBranch: msg.deleteBranch === true }, as)).then((error) => {
-            ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
+            ctx.sendTo(c, { t: 'board.closed', ...ref, error });
             if (error) return;
             if (ref.kind === 'pull') return ctx.toastFloor(floor, `${who} closed ${named(ref)} without merging`);
             // Nobody should be seated for an issue that's closed.
@@ -98,26 +98,26 @@ export const githubHandlers = {
       );
     }, (err: Error) => failed(err.message));
   },
-  'gh.labels'(ctx, c, msg) {
+  'board.labels'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
     const ref = refOf(msg);
     if (!floor || !ref) return;
-    const names = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((l) => str(l, GH_LABEL_MAX + 1)).filter((l) => l && l.length <= GH_LABEL_MAX))].slice(0, 100);
+    const names = (v: unknown) => [...new Set((Array.isArray(v) ? v : []).map((l) => str(l, LABEL_MAX + 1)).filter((l) => l && l.length <= LABEL_MAX))].slice(0, 100);
     const add = names(msg.add);
     const remove = names(msg.remove).filter((l) => !add.includes(l));
     if (!add.length && !remove.length) {
-      ctx.sendTo(c, { t: 'gh.labeled', ...ref, error: 'No labels to change' });
+      ctx.sendTo(c, { t: 'board.labeled', ...ref, error: 'No labels to change' });
       return;
     }
     ctx.withHost(
       c,
       (as) =>
         void (ref.kind === 'issue' ? floor.tracker.setLabels(ref.key, add, remove, as) : floor.host.setLabels(ref.number, add, remove, as)).then((r) => {
-          ctx.sendTo(c, { t: 'gh.labeled', ...ref, ...r });
+          ctx.sendTo(c, { t: 'board.labeled', ...ref, ...r });
           if (r.labels) ctx.toastFloor(floor, `🏷️ ${who} labeled ${named(ref)}: ${[...add.map((l) => `+${l}`), ...remove.map((l) => `−${l}`)].join(' ')}`);
         }),
-      (error) => ctx.sendTo(c, { t: 'gh.labeled', ...ref, error }),
+      (error) => ctx.sendTo(c, { t: 'board.labeled', ...ref, error }),
     );
   },
-} satisfies HandlerMap<GitHubClientMsg>;
+} satisfies HandlerMap<BoardClientMsg>;

@@ -1,4 +1,4 @@
-import type { Choice, GhIssue, GhPull } from '../../../shared/protocol';
+import type { Choice, Issue, Pull } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { store, workerForPull } from '../../state';
 import { h, openModal } from '../dom';
@@ -14,10 +14,10 @@ export interface CloseOptions {
 }
 
 /** Closes an issue (for one of the tracker's reasons) or a PR without merging, with an optional comment. */
-export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net, onClosed: () => void, host: CloseOptions) {
+export function openClose(kind: 'issue' | 'pull', it: Issue | Pull, net: Net, onClosed: () => void, host: CloseOptions) {
   const ref = refTo(kind, it);
   const key = waitKey(ref);
-  const pull = kind === 'pull' ? (it as GhPull) : null;
+  const pull = kind === 'pull' ? (it as Pull) : null;
   let reason = host.reasons[0]?.id;
   let busy = false;
 
@@ -77,7 +77,7 @@ export function openClose(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net
       modal.close();
       onClosed();
     });
-    net.send({ t: 'gh.close', ...ref, comment: comment.value.trim() || undefined, reason: pull ? undefined : reason, deleteBranch: !!pull && host.deleteBranch && del.checked });
+    net.send({ t: 'board.close', ...ref, comment: comment.value.trim() || undefined, reason: pull ? undefined : reason, deleteBranch: !!pull && host.deleteBranch && del.checked });
   });
   setTimeout(() => comment.focus(), 30);
 }

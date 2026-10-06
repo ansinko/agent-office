@@ -1,4 +1,4 @@
-import type { GhCheck, GhPull, GhPullDetail } from '../../../shared/protocol';
+import type { Check, Pull, PullDetail } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
 import { mergeWaiters } from './api';
@@ -6,7 +6,7 @@ import { deleteBranchPref, MERGE_KEY, mergePref, savePref } from './prefs';
 
 // ---- Whether a PR can merge ---------------------------------------------------------------------
 
-const CHECK_ICON: Record<GhCheck['state'], string> = { pass: '✅', fail: '❌', pending: '🟡', skip: '⚪' };
+const CHECK_ICON: Record<Check['state'], string> = { pass: '✅', fail: '❌', pending: '🟡', skip: '⚪' };
 
 interface MergeStatus {
   icon: string;
@@ -19,11 +19,11 @@ interface MergeStatus {
 }
 
 /** An open PR whose branch can't merge until someone resolves conflicts with the base. */
-export function conflicted(d: GhPullDetail) {
+export function conflicted(d: PullDetail) {
   return d.state === 'open' && d.readiness === 'conflict';
 }
 
-export function mergeStatus(d: GhPullDetail): MergeStatus {
+export function mergeStatus(d: PullDetail): MergeStatus {
   const failing = d.checks.filter((c) => c.state === 'fail').length;
   const pending = d.checks.filter((c) => c.state === 'pending').length;
   if (d.state === 'merged') return { icon: '🎉', text: 'Merged.', cls: 'ok', can: false, auto: false };
@@ -42,8 +42,8 @@ export function mergeStatus(d: GhPullDetail): MergeStatus {
   return { icon: '✅', text: `Ready to merge: no conflicts with ${d.baseRefName}${d.checks.length ? ' and all checks passed' : ''}.`, cls: 'ok', can: true, auto: false };
 }
 
-export function checksList(checks: GhCheck[]) {
-  const order: GhCheck['state'][] = ['fail', 'pending', 'pass', 'skip'];
+export function checksList(checks: Check[]) {
+  const order: Check['state'][] = ['fail', 'pending', 'pass', 'skip'];
   const sorted = [...checks].sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state));
   return h(
     'ul.gh-checks',
@@ -54,7 +54,7 @@ export function checksList(checks: GhCheck[]) {
 
 // ---- Merge dialog -------------------------------------------------------------------------------
 
-export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: () => void, onMerged: () => void) {
+export function openMerge(it: Pull, d: PullDetail, net: Net, handToWorker: () => void, onMerged: () => void) {
   const st = mergeStatus(d);
   const { methods, caps } = d.repo;
   // Auto-merge is offered only where the host can merge once the requirements pass.
@@ -134,7 +134,7 @@ export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: (
       modal.close();
       onMerged();
     });
-    net.send({ t: 'gh.merge', number: it.number, method, deleteBranch: deleteBranch && caps.deleteBranch, auto: auto.checked && canAuto });
+    net.send({ t: 'board.merge', number: it.number, method, deleteBranch: deleteBranch && caps.deleteBranch, auto: auto.checked && canAuto });
   });
   setTimeout(() => (st.can ? go : cancel).focus(), 30);
 }

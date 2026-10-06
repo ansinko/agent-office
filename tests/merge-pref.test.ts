@@ -8,7 +8,7 @@ Object.defineProperty(globalThis, 'localStorage', {
   value: { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => void storage.set(k, String(v)), removeItem: (k: string) => void storage.delete(k) },
 });
 
-const { MERGE_KEY, mergePref } = await import('../src/client/ui/github/prefs.js');
+const { MERGE_KEY, mergePref } = await import('../src/client/ui/board-windows/prefs.js');
 
 test('a stored squash preference still picks squash from a list of choices', () => {
   localStorage.setItem(MERGE_KEY, JSON.stringify({ method: 'squash', deleteBranch: false }));

@@ -4,13 +4,13 @@ import type { ClientMsg } from '../../../shared/protocol.js';
 import { accountsHandlers } from './accounts.js';
 import { appScreenHandlers, appScreenView } from './appscreen.js';
 import { ballHandlers, ballHooks, ballView } from './ball.js';
+import { boardHandlers, issuesView, pullsView } from './boards.js';
 import { cabinetHandlers, cabinetHooks, cabinetView } from './cabinet.js';
 import { carHandlers, carHooks, carsView } from './car.js';
 import { changesHandlers, changesHooks } from './changes.js';
 import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
-import { githubHandlers, issuesView, pullsView } from './github.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { spotifyHandlers } from './spotify.js';
 import { meetingHandlers, meetingView } from './meetings.js';
@@ -31,13 +31,13 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...accountsHandlers,
   ...appScreenHandlers,
   ...ballHandlers,
+  ...boardHandlers,
   ...cabinetHandlers,
   ...carHandlers,
   ...changesHandlers,
   ...decorHandlers,
   ...dogHandlers,
   ...floorHandlers,
-  ...githubHandlers,
   ...jukeboxHandlers,
   ...spotifyHandlers,
   ...meetingHandlers,

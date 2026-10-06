@@ -1,9 +1,12 @@
-import type { GhComment, IssueState, PullReview, PullState } from '../../../shared/protocol';
-import { AVATAR_COLORS } from '../../state';
+import type { Comment, IssueState, PullReview, PullState } from '../../../shared/protocol';
+import { AVATAR_COLORS, store } from '../../state';
 import { h, timeAgo } from '../dom';
 import { markdown } from '../markdown';
 
 // ---- Small pieces ---------------------------------------------------------------------------------
+
+/** What the floor's code host is called, for "Open on GitHub" and the load errors. */
+export const hostName = (floor = store.currentFloor()) => floor?.host?.name ?? 'GitHub';
 
 export function avatar(name: string) {
   let x = 0;
@@ -24,7 +27,7 @@ export const REVIEW_BADGE: Partial<Record<PullReview, [string, string]>> = {
 /** A review that only comments, or was dismissed. */
 export const REVIEWED_BADGE: [string, string] = ['💬 reviewed', ''];
 
-export function commentCard(c: GhComment, itemUrl: string, verb: string, badge?: [string, string]) {
+export function commentCard(c: Comment, itemUrl: string, verb: string, badge?: [string, string]) {
   return h(
     'article.gh-card',
     { class: badge?.[1] ? `is-${badge[1]}` : '' },
@@ -43,7 +46,7 @@ export function spinnerRow(text: string) {
 }
 
 export function errorBox(text: string, retry?: () => void) {
-  return h('div.gh-error', {}, `Couldn't load from GitHub: ${text}`, retry ? h('button.btn', { type: 'button', onclick: retry }, 'Try again') : null);
+  return h('div.gh-error', {}, `Couldn't load from ${hostName()}: ${text}`, retry ? h('button.btn', { type: 'button', onclick: retry }, 'Try again') : null);
 }
 
 export function stateOf(it: { state: PullState | IssueState }): [string, string] {

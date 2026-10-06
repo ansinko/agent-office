@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 import { SLAB } from '../../shared/layout';
-import type { GhIssue } from '../../shared/protocol';
+import type { Issue } from '../../shared/protocol';
 import type { Ctx } from '../core/context';
 import type { CoreState } from '../core/ctx';
 import type { Parts } from '../core/parts';
@@ -25,7 +25,7 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
 
   let target: Interactable | null = null;
   /** The note on the issues board under the crosshair (or, in third person, the mouse), which E takes. */
-  let aimedNote: GhIssue | null = null;
+  let aimedNote: Issue | null = null;
   /** Where the mouse is over the scene, for pointing at notes in third person; null when it's off it. */
   let pointer: THREE.Vector2 | null = null;
 
@@ -116,7 +116,7 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   }
 
   /** The issue whose note on the issues board an aim lands on, or null (bare cork, the frame, anything else). */
-  function noteUnder(aim: { it: Interactable; hit: THREE.Intersection } | null): GhIssue | null {
+  function noteUnder(aim: { it: Interactable; hit: THREE.Intersection } | null): Issue | null {
     if (aim?.it.kind !== 'issues' || aim.hit.object !== ctx.world().boardMeshes.issues || !aim.hit.uv) return null;
     const n = parts.boards.issuesTex.noteAt(aim.hit.uv);
     return n === undefined ? null : (store.issues.items.find((i) => i.key === n) ?? null);

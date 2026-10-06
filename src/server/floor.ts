@@ -12,7 +12,7 @@ import { adapterFor } from './hosts/registry.js';
 import { noHost } from './hosts/none.js';
 import { MergeWatch } from './hosts/watch.js';
 import type { CodeHost, HostAdapter, HostAs, Tracker } from './hosts/types.js';
-import type { Remote } from '../shared/hosts.js';
+import { HOST_NAMES, type Remote } from '../shared/hosts.js';
 import { TaskQueue } from './queue.js';
 import { Changes } from './changes.js';
 import { Decor } from './decor.js';
@@ -219,7 +219,7 @@ export class Floor {
     this.remote = originRemote(def.dir);
     this.adapter = adapterFor(this.remote);
     const onPulls = (state: CodeHost['pulls']) => {
-      ctx.emit(this, { t: 'gh.pulls', state });
+      ctx.emit(this, { t: 'board.pulls', state });
       this.queue?.onPulls(state.items);
       if (state.loading || state.error) return;
       // A worker may have opened one from a branch it made itself, mid-turn or from a shell.
@@ -231,7 +231,7 @@ export class Floor {
       this.sendLandedHome();
       ctx.pullsChanged(this);
     };
-    const onIssues = (state: Tracker['issues']) => ctx.emit(this, { t: 'gh.issues', state });
+    const onIssues = (state: Tracker['issues']) => ctx.emit(this, { t: 'board.issues', state });
     const none = this.adapter ? undefined : noHost(this.remote);
     this.host = this.adapter?.pulls(def.dir, onPulls) ?? none!.pulls;
     this.tracker = this.adapter?.issues(def.dir, onIssues, this.host) ?? none!.issues;
@@ -407,10 +407,14 @@ export class Floor {
 
   info(): FloorInfo {
     const ws = this.workers.list();
+    const r = this.remote;
+    const name = r && (this.adapter?.name ?? HOST_NAMES[r.kind]);
     return {
       id: this.id,
       name: this.def.name,
       repo: this.def.repo,
+      host: r && name ? { kind: r.kind, name, repo: r.repo, url: r.url } : null,
+      tracker: r && name ? { kind: r.kind, name } : null,
       dir: this.dir,
       branch: this.project.branch,
       palette: this.def.palette,

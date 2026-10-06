@@ -4,13 +4,13 @@
  * and the meeting room's two. What E does at each is defined with it.
  */
 import type * as THREE from 'three';
-import type { GhIssue } from '../../../shared/protocol';
+import type { Issue } from '../../../shared/protocol';
 import type { Ctx } from '../../core/context';
 import { aside, boardHint, hintTitle, key, onE } from '../../core/hint';
 import { store, type Topic } from '../../state';
 import { openBoard } from '../../ui/boards';
-import { inProgress } from '../../ui/github/progress';
-import type { BoardActions } from '../../ui/github/prompts';
+import { inProgress } from '../../ui/board-windows/progress';
+import type { BoardActions } from '../../ui/board-windows/prompts';
 import { clip } from '../../ui/dom';
 import { openIssue } from '../../ui/pull';
 import { openServices } from '../../ui/services';
@@ -31,9 +31,9 @@ declare module '../../world/types' {
 
 export interface BoardsDeps {
   /** The note on the issues board you're pointing at, if any (see aimedNote in input/pointer.ts). */
-  aimedNote(): GhIssue | null;
+  aimedNote(): Issue | null;
   /** Takes an issue's card off the board, into your hands (see features/carrying). */
-  pickUp(it: GhIssue): void;
+  pickUp(it: Issue): void;
   /** What a board's buttons do: hand an issue to a worker, call a meeting about it… */
   boardActions(): BoardActions;
   /** The task queue's window. */

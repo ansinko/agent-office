@@ -1,12 +1,12 @@
 // A floor's issues on GitHub, through the gh CLI: the board, the issue window, and workers taking them.
-import type { BoardRef, Choice, GhComment, GhIssue, GhIssueDetail, GhLabel, GhState } from '../../../shared/protocol.js';
+import type { BoardRef, Choice, Comment, Issue, IssueDetail, Label, BoardState } from '../../../shared/protocol.js';
 import type { CodeHost, HostAs, Tracker } from '../types.js';
 import { Claims } from '../watch.js';
 import { GITHUB_CAPS, GITHUB_REASONS, issueState } from './map.js';
 import { commentsOf, gh, labels, postComment, putLabels, Relabels } from './gh.js';
 
 export class GitHubIssues implements Tracker {
-  issues: GhState<GhIssue> = { items: [], fetchedAt: 0, loading: false };
+  issues: BoardState<Issue> = { items: [], fetchedAt: 0, loading: false };
   /** Labels just changed from the office, by issue key. */
   private relabeled = new Relabels();
   private claims = new Claims();
@@ -15,7 +15,7 @@ export class GitHubIssues implements Tracker {
 
   constructor(
     private dir: string,
-    private onIssues: (s: GhState<GhIssue>) => void,
+    private onIssues: (s: BoardState<Issue>) => void,
     /** The floor's pull requests on GitHub: one repository, so one look at its name, login and labels. */
     private host: CodeHost,
   ) {}
@@ -27,15 +27,15 @@ export class GitHubIssues implements Tracker {
     return (await this.host.repoInfo()).reasons;
   }
 
-  async issueDetail(key: string, me?: string): Promise<GhIssueDetail> {
+  async issueDetail(key: string, me?: string): Promise<IssueDetail> {
     const [view, viewer] = await Promise.all([gh(['issue', 'view', key, '--json', 'number,state,body,comments'], this.dir), me ?? this.host.viewer()]);
     const i = JSON.parse(view);
     return { key: String(i.number), state: issueState(i.state), body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer, reasons: GITHUB_REASONS, caps: { labels: GITHUB_CAPS.labels } };
   }
 
   /** Comments on an issue, as `as` or else the office. Returns the comment as GitHub saved it, or why it couldn't. */
-  async comment(ref: BoardRef & { kind: 'issue' }, body: string, as?: HostAs): Promise<{ comment?: GhComment; error?: string }> {
-    let comment: GhComment;
+  async comment(ref: BoardRef & { kind: 'issue' }, body: string, as?: HostAs): Promise<{ comment?: Comment; error?: string }> {
+    let comment: Comment;
     try {
       comment = await postComment(this.dir, ref.key, body, as?.env);
     } catch (err) {
@@ -66,13 +66,13 @@ export class GitHubIssues implements Tracker {
   }
 
   /** The repository's labels, from the same list the pull requests' picker uses. */
-  repoLabels(): Promise<GhLabel[]> {
+  repoLabels(): Promise<Label[]> {
     return this.host.repoLabels();
   }
 
   /** Puts labels on an issue and takes others off, as `as` or else the office. Returns the labels it has now, or why they didn't change. */
-  async setLabels(key: string, add: string[], remove: string[], as?: HostAs): Promise<{ labels?: GhLabel[]; error?: string }> {
-    let now: GhLabel[];
+  async setLabels(key: string, add: string[], remove: string[], as?: HostAs): Promise<{ labels?: Label[]; error?: string }> {
+    let now: Label[];
     try {
       now = await putLabels(this.dir, key, add, remove, as?.env);
     } catch (err) {
@@ -133,7 +133,7 @@ export class GitHubIssues implements Tracker {
         gh(['issue', 'list', '--state', 'open', '--limit', '300', '--json', fields], this.dir),
         gh(['issue', 'list', '--state', 'closed', '--limit', '40', '--json', fields], this.dir),
       ]);
-      const fetched: GhIssue[] = [...JSON.parse(open), ...JSON.parse(closed)].map((i: any) => ({
+      const fetched: Issue[] = [...JSON.parse(open), ...JSON.parse(closed)].map((i: any) => ({
         key: String(i.number),
         ref: `#${i.number}`,
         title: i.title,

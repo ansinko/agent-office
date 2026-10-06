@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { GhPull, LeaveOnMergeState, QueueTask, WorkerInfo } from '../shared/protocol.js';
+import type { Pull, LeaveOnMergeState, QueueTask, WorkerInfo } from '../shared/protocol.js';
 import { DESK_BY_ID } from '../shared/layout.js';
 import { isBusy, workerPr, type WorkerPr } from '../shared/status.js';
 
@@ -72,7 +72,7 @@ export interface Landed {
  * A worker across repositories has pull requests on other floors too (`pullsOf` has their lists):
  * none of them may be open, or opened from its desk but missing from its floor's list.
  */
-export function landedWorkers(workers: WorkerInfo[], pulls: GhPull[], tasks: QueueTask[], pullsOf?: (floor: string) => GhPull[] | undefined): Landed[] {
+export function landedWorkers(workers: WorkerInfo[], pulls: Pull[], tasks: QueueTask[], pullsOf?: (floor: string) => Pull[] | undefined): Landed[] {
   const out: Landed[] = [];
   for (const w of workers) {
     if (notLeaving(w)) continue;
@@ -100,7 +100,7 @@ export function notLeaving(w: WorkerInfo): string | undefined {
  * A worker's work, landed: a pull request of its merged and none is open (see workerPr), with the
  * heads of what merged, whatever the worker is doing now. Undefined when that isn't so.
  */
-export function landedWork(w: WorkerInfo, pulls: GhPull[], tasks: QueueTask[], pullsOf?: (floor: string) => GhPull[] | undefined): Landed | undefined {
+export function landedWork(w: WorkerInfo, pulls: Pull[], tasks: QueueTask[], pullsOf?: (floor: string) => Pull[] | undefined): Landed | undefined {
   const pr = workerPr(w, pulls, tasks);
   if (w.repos?.length) return landedAcross(w, pr, pulls, pullsOf);
   if (pr?.state !== 'merged') return undefined;
@@ -108,7 +108,7 @@ export function landedWork(w: WorkerInfo, pulls: GhPull[], tasks: QueueTask[], p
 }
 
 /** landedWorkers for a worker across repositories, whose own floor's PR, if any, is `own`. */
-function landedAcross(w: WorkerInfo, own: WorkerPr | undefined, pulls: GhPull[], pullsOf?: (floor: string) => GhPull[] | undefined): Landed | undefined {
+function landedAcross(w: WorkerInfo, own: WorkerPr | undefined, pulls: Pull[], pullsOf?: (floor: string) => Pull[] | undefined): Landed | undefined {
   if (own?.state === 'open') return undefined;
   const heads: Record<string, string | undefined> = {};
   const prs: string[] = [];

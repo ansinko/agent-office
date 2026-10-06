@@ -1,6 +1,6 @@
 // The boards of a floor whose code is on a host the office cannot read yet, or that has no remote:
 // both say why, and nothing on them calls out anywhere.
-import type { GhIssue, GhPull, GhState } from '../../shared/protocol.js';
+import type { Issue, Pull, BoardState } from '../../shared/protocol.js';
 import { HOST_NAMES, type Remote } from '../../shared/hosts.js';
 import type { CodeHost, Tracker } from './types.js';
 
@@ -15,10 +15,10 @@ function why(remote: Remote | undefined): string {
  */
 export function noHost(remote: Remote | undefined): { pulls: CodeHost; issues: Tracker } {
   const error = why(remote);
-  const state = <T>(): GhState<T> => ({ items: [], error, fetchedAt: 0, loading: false });
+  const state = <T>(): BoardState<T> => ({ items: [], error, fetchedAt: 0, loading: false });
   const refuse = () => Promise.reject(new Error(error));
   const pulls: CodeHost = {
-    pulls: state<GhPull>(),
+    pulls: state<Pull>(),
     refresh: async () => {},
     stop() {},
     repoInfo: refuse,
@@ -41,7 +41,7 @@ export function noHost(remote: Remote | undefined): { pulls: CodeHost; issues: T
     setPullBody: refuse,
   };
   const issues: Tracker = {
-    issues: state<GhIssue>(),
+    issues: state<Issue>(),
     refresh: async () => {},
     stop() {},
     reasons: refuse,

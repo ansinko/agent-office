@@ -13,7 +13,7 @@ import type {
   PullState,
   RepoInfo,
 } from '../../shared/protocol.js';
-import type { HostCommands, HostKind } from '../../shared/hosts.js';
+import type { HostCommands, HostKind, Remote } from '../../shared/hosts.js';
 import type { GhAs } from '../signins.js';
 
 /** Who a write runs as: someone's own sign-in, by its env. Undefined means the office's own. */
@@ -74,7 +74,8 @@ export interface HostAdapter {
   /** Shown in the client: "GitHub". */
   name: string;
   cli: HostCli;
-  pulls(dir: string, onPulls: (s: BoardState<Pull>) => void): CodeHost;
+  /** `remote` is the floor's origin when the caller has already read it. */
+  pulls(dir: string, onPulls: (s: BoardState<Pull>) => void, remote?: Remote): CodeHost;
   /** The floor's issues; `host` is its code host, whose repository info, login and labels a tracker on the same host shares. */
   issues(dir: string, onIssues: (s: BoardState<Issue>) => void, host: CodeHost): Tracker;
 }

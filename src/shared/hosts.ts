@@ -38,6 +38,20 @@ export const GITHUB_COMMANDS: HostCommands = {
   cliName: 'gh',
 };
 
+/** Bitbucket's, through the bkt CLI. Its issues are on Jira, which has no commands here yet. */
+export const BITBUCKET_COMMANDS: HostCommands = {
+  viewPull: 'bkt pr view {{number}}',
+  diffPull: 'bkt pr diff {{number}}',
+  checkout: 'bkt pr checkout {{number}}',
+  checks: 'bkt pr checks {{number}} --wait',
+  lineComments: 'bkt pr comments {{number}}',
+  createPr: 'bkt pr create',
+  viewIssue: '',
+  listIssues: '',
+  pullCommands: 'bkt pr view, bkt pr diff, bkt pr checks',
+  cliName: 'bkt',
+};
+
 /** Just the command lines of `cli`, which may carry more (the server's merge line). */
 export function commandsOf(cli: HostCommands): HostCommands {
   const { viewPull, diffPull, checkout, checks, lineComments, createPr, viewIssue, listIssues, pullCommands, cliName } = cli;

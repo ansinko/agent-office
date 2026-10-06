@@ -120,6 +120,20 @@ export function cigarette(): { group: THREE.Group; ember: THREE.MeshToonMaterial
 }
 
 /**
+ * A cigarette sticking out of a fist at the end of `arm` (see Person), hidden until a smoke break:
+ * lit end pointing down at your side, and up and away when it's at your mouth.
+ */
+export function heldCigarette(arm: THREE.Object3D): { group: THREE.Group; ember: THREE.MeshToonMaterial } {
+  const cig = cigarette();
+  const along = new THREE.Vector3(0, -0.9, -0.44).normalize();
+  cig.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
+  cig.group.position.set(0, -0.38, 0).addScaledVector(along, 0.07);
+  cig.group.visible = false;
+  arm.add(cig.group);
+  return cig;
+}
+
+/**
  * An open cardboard box with someone's desk things in it: a plant, a photo, a mug, a rubber duck and
  * some papers. It stands on y = 0 with its front toward +z.
  */

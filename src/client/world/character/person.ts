@@ -12,7 +12,8 @@ import { UNDEAD_SKIN } from '../costumes';
 import { HolidayOutfit } from './person-outfit';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
-import { cigarette, coffeeMug, drinkGlass, putDownGlass } from './props';
+import { coffeeMug, drinkGlass, heldCigarette, putDownGlass } from './props';
+import { ShirtPrint } from './person-print';
 import { styleHair } from './person-hair';
 import { clubSwing, strike, swingStep, type Golf } from './person-golf';
 import { propPosition, throwStep, type Oche } from './person-throw';
@@ -41,6 +42,7 @@ export class Person {
   private armL: THREE.Object3D;
   private armR: THREE.Object3D;
   private shirt: THREE.MeshToonMaterial;
+  private print: ShirtPrint;
   private skin: THREE.MeshToonMaterial;
   private hairMat: THREE.MeshToonMaterial;
   private hair = new THREE.Group();
@@ -135,6 +137,7 @@ export class Person {
     this.root.add(this.body);
     const torso = mesh(new THREE.CapsuleGeometry(0.26, 0.28, 6, 12), this.shirt, 0, 0.72, 0);
     this.body.add(torso);
+    (this.print = new ShirtPrint(this.body, this.shirt)).paint(look.print);
     // Head
     const head = (this.head = new THREE.Group());
     head.position.y = 1.32;
@@ -177,16 +180,8 @@ export class Person {
     this.mug.position.set(0, -0.38, 0);
     this.mug.visible = false;
     this.armR.add(this.mug);
-    // For smoke breaks: a cigarette sticking out of the right fist (the arm on -x, see reach), lit end
-    // pointing down at your side and up and away when it's at your mouth.
-    const cig = cigarette();
-    this.cig = cig.group;
-    this.ember = cig.ember;
-    const along = new THREE.Vector3(0, -0.9, -0.44).normalize();
-    this.cig.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), along);
-    this.cig.position.set(0, -0.38, 0).addScaledVector(along, 0.07);
-    this.cig.visible = false;
-    this.armL.add(this.cig);
+    // For smoke breaks, in the right fist (the arm on -x, see reach).
+    ({ group: this.cig, ember: this.ember } = heldCigarette(this.armL));
     // Between the hands when both arms are out in front (see update), its front to whoever they walk up to.
     const holder = this.cardHolder;
     holder.position.set(0, 0.8, 0.36);
@@ -219,6 +214,7 @@ export class Person {
 
   setColor(color: string) {
     this.shirt.color.set(color);
+    this.print.paint(this.look.print, !!this.costume);
   }
 
   get skinColor(): string {
@@ -231,6 +227,7 @@ export class Person {
     this.hairMat.color.set(HAIR_COLORS[look.hair]);
     if (restyle) this.buildHair();
     this.dress();
+    this.print.paint(look.print, !!this.costume);
   }
 
   /** Dresses up for a holiday, head to toe (see person-outfit.ts), with undead skin for Halloween. Null takes it off. */
@@ -239,6 +236,7 @@ export class Person {
     this.costume = theme;
     (this.outfit ??= new HolidayOutfit(this.rig)).set(theme);
     this.dress();
+    this.print.paint(this.look.print, !!theme);
   }
 
   /** The skin and hair under the costume: hair that would poke through a hat's crown hides under it. */

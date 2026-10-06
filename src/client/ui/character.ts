@@ -1,7 +1,7 @@
 import './character.css';
 import * as THREE from 'three';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
-import { HAIR_COLOR_NAMES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES, randomLook, randomName, type Look } from '../../shared/avatar';
+import { HAIR_COLOR_NAMES, HAIR_COLORS, HAIR_STYLES, PRINT_MAX, SKIN_TONES, cleanPrint, randomLook, randomName, type Look } from '../../shared/avatar';
 import { AVATAR_COLORS, saveProfile, store, type Profile } from '../state';
 import { Person } from '../world/character';
 import { toonUnique } from '../world/toon';
@@ -128,7 +128,7 @@ class Preview {
 }
 
 /**
- * The character select screen: your name, skin tone, hair and shirt, with a live preview.
+ * The character select screen: your name, skin tone, hair, shirt and its print, with a live preview.
  * `first` is the one you see when you join: closing it goes in as whoever's picked so far.
  */
 export function openCharacter(first: boolean, onSave: (p: Profile) => void) {
@@ -159,6 +159,14 @@ export function openCharacter(first: boolean, onSave: (p: Profile) => void) {
   const styleRow = h('div.seg', { role: 'radiogroup', 'aria-label': 'Hair style' });
   const hairRow = h('div.swatches', { role: 'radiogroup', 'aria-label': 'Hair color' });
   const shirtRow = h('div.swatches', { role: 'radiogroup', 'aria-label': 'Shirt color' });
+  const printInput = h('input', { type: 'text', maxlength: PRINT_MAX, value: pick.look.print ?? '', placeholder: 'Nothing, or your team', 'aria-label': 'Shirt print' }) as HTMLInputElement;
+  // Redrawn as you type, without the hop: that's for picks, not every letter.
+  printInput.addEventListener('input', () => {
+    const print = cleanPrint(printInput.value);
+    if (print) pick.look.print = print;
+    else delete pick.look.print;
+    preview.person.setLook(pick.look);
+  });
 
   const swatch = (color: string, label: string, on: boolean, choose: () => void) =>
     h('button.swatch', { type: 'button', role: 'radio', 'aria-checked': String(on), style: `background:${color}`, class: on ? 'sel' : '', 'aria-label': label, title: label, onclick: choose });
@@ -212,6 +220,8 @@ export function openCharacter(first: boolean, onSave: (p: Profile) => void) {
         hairRow,
         h('label', {}, 'Shirt'),
         shirtRow,
+        h('label', {}, 'Shirt print'),
+        printInput,
       ),
     ),
     h('footer', {}, surprise, h('span.grow'), save),

@@ -41,7 +41,7 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     id,
     name,
     color: COLOR_RE.test(colorParam) ? colorParam : '#4f86f7',
-    look: sanitizeLook({ skin: intParam('skin'), hair: intParam('hair'), style: intParam('style') }, lookFromSeed(id)),
+    look: sanitizeLook({ skin: intParam('skin'), hair: intParam('hair'), style: intParam('style'), print: url.searchParams.get('print') ?? undefined }, lookFromSeed(id)),
     x: spot.x,
     y: spot.y,
     z: spot.z,

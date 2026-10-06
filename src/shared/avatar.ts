@@ -10,6 +10,17 @@ export interface Look {
   skin: number;
   hair: number;
   style: number;
+  /** A word printed across the front of the shirt, like a team name. */
+  print?: string;
+}
+
+/** How long a shirt print can be: any longer and the letters get too small to read. */
+export const PRINT_MAX = 12;
+
+/** A shirt print as it can go on the shirt: one line, no control characters, at most PRINT_MAX. */
+export function cleanPrint(v: unknown): string {
+  if (typeof v !== 'string') return '';
+  return [...v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim()].slice(0, PRINT_MAX).join('').trim();
 }
 
 function hash(s: string): number {
@@ -38,17 +49,22 @@ export function randomName(): string {
   return `${pick(NAME_ADJECTIVES)} ${pick(NAME_ANIMALS)}`;
 }
 
-/** Coerces anything into a valid look, keeping each part of `fallback` that `x` gets wrong. */
+/**
+ * Coerces anything into a valid look, keeping each part of `fallback` that `x` gets wrong. The print
+ * is the exception: a look without one is a plain shirt, so it never comes from `fallback`.
+ */
 export function sanitizeLook(x: unknown, fallback: Look): Look {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
   const idx = (v: unknown, n: number, d: number) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < n ? (v as number) : d);
+  const print = cleanPrint(o.print);
   return {
     skin: idx(o.skin, SKIN_TONES.length, fallback.skin),
     hair: idx(o.hair, HAIR_COLORS.length, fallback.hair),
     style: idx(o.style, HAIR_STYLES.length, fallback.style),
+    ...(print ? { print } : {}),
   };
 }
 
 export function sameLook(a: Look, b: Look): boolean {
-  return a.skin === b.skin && a.hair === b.hair && a.style === b.style;
+  return a.skin === b.skin && a.hair === b.hair && a.style === b.style && (a.print ?? '') === (b.print ?? '');
 }

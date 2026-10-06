@@ -3,6 +3,7 @@ import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync
 import os from 'node:os';
 import path from 'node:path';
 import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/floors.js';
+import { parseRemote, type Remote } from '../shared/hosts.js';
 import type { CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
 import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
 import { gh } from './github.js';
@@ -514,7 +515,17 @@ function unwritable(dir: string): string | undefined {
 export function originRepo(dir: string): string | undefined {
   try {
     const url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim();
-    return /github\.com[/:]/i.test(url) ? normalizeRepo(url) : undefined;
+    const r = parseRemote(url);
+    return r?.kind === 'github' ? r.repo : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The host and repository a checkout's origin points at, when the office knows the host. */
+export function originRemote(dir: string): Remote | undefined {
+  try {
+    return parseRemote(execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim());
   } catch {
     return undefined;
   }

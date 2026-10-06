@@ -12,6 +12,8 @@ import { Ledger } from '../usage.js';
 import { PlanLimitsReader } from '../limits.js';
 import { Webhook } from '../webhook.js';
 import { Machine } from '../machine.js';
+import { AppScreen } from '../appscreen/index.js';
+import { OFFICE_MAP } from '../../shared/maps/index.js';
 import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
 import { Themes } from '../theme.js';
@@ -126,7 +128,21 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  // The meeting room's screen: its pages, snapshotted while someone is on a floor of the office map
+  // (the only one with the screen), and its apps served on a port of its own for its window.
+  const appScreen = new AppScreen({
+    dataDir: cfg.dataDir,
+    url: cfg.meetingScreenUrl,
+    host: cfg.host,
+    port: cfg.meetingScreenPort,
+    tls: cfg.tls,
+    signedIn: (req) => ctx.auth.fromAnyCookie(req),
+    active: () => ctx.maps.pick() === OFFICE_MAP && [...clients.values()].some((c) => !c.out && ctx.floorOf(c)),
+    changed: (state) => ctx.broadcast({ t: 'appScreen', state }),
+  });
+  appScreen.start();
+
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, appScreen, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

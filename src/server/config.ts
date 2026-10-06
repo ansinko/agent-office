@@ -61,6 +61,10 @@ export interface Config {
   weather?: Weather;
   /** The sky keeps real time (a day a day), instead of a whole day and night every hour. */
   realTimeSky: boolean;
+  /** The page put up on the meeting room's screen at start (see server/appscreen), as the screen's window does. */
+  meetingScreenUrl?: string;
+  /** The port the meeting room screen's local pages are served on for their window (default the office's port + 10). */
+  meetingScreenPort: number;
 }
 
 export interface RTCIceServerLike {
@@ -161,6 +165,16 @@ Options:
                           it's night there, instead of a day and night every hour
                           (⚙️ Settings can switch it)
                           (env AGENT_OFFICE_SKY_CLOCK=real)
+      --meeting-screen-url <url>
+                          Put this web page up on the meeting room's screen,
+                          saving it with the screen's pages if it isn't one
+                          (env AGENT_OFFICE_MEETING_SCREEN_URL). The pages are
+                          also set at the screen in the office
+      --meeting-screen-port <n>
+                          Port the screen's pages on this machine's network
+                          are served on for their window (default the
+                          office's port + 10, env
+                          AGENT_OFFICE_MEETING_SCREEN_PORT)
   -h, --help              Show this help
 
 Started in a terminal, the office opens in your browser already signed in, with
@@ -241,6 +255,8 @@ export function loadConfig(argv: string[]): Config {
   let city = process.env.AGENT_OFFICE_CITY || '';
   let weather = process.env.AGENT_OFFICE_WEATHER || '';
   let realTimeSky = process.env.AGENT_OFFICE_SKY_CLOCK === 'real';
+  let meetingScreenUrl = process.env.AGENT_OFFICE_MEETING_SCREEN_URL;
+  let meetingScreenPort = process.env.AGENT_OFFICE_MEETING_SCREEN_PORT || '';
   const iceServers: RTCIceServerLike[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
   // A container can't take --turn (deploy/container/compose.yaml), so the TURN servers come from the environment too.
   for (const url of (process.env.AGENT_OFFICE_TURN ?? '').split(/\s+/).filter(Boolean)) iceServers.push(parseTurn(url));
@@ -326,6 +342,12 @@ export function loadConfig(argv: string[]): Config {
       case '--real-time-sky':
         realTimeSky = true;
         break;
+      case '--meeting-screen-url':
+        meetingScreenUrl = takeValue(argv, i++, a);
+        break;
+      case '--meeting-screen-port':
+        meetingScreenPort = takeValue(argv, i++, a);
+        break;
       default:
         if (a.startsWith('-')) {
           console.error(`agent-office: unknown option ${a}\n`);
@@ -359,6 +381,11 @@ export function loadConfig(argv: string[]): Config {
   const workerLimit = maxWorkers ? parseWorkerLimit(maxWorkers) : undefined;
   if (maxWorkers && workerLimit === undefined) {
     console.error(`agent-office: --max-workers needs a whole number from 1 to ${MAX_WORKER_LIMIT}, e.g. --max-workers 6`);
+    process.exit(2);
+  }
+  const screenPort = meetingScreenPort ? Number(meetingScreenPort) : port + 10;
+  if (!Number.isInteger(screenPort) || screenPort <= 0 || screenPort > 65535 || screenPort === port) {
+    console.error("agent-office: --meeting-screen-port needs a port of its own, other than the office's");
     process.exit(2);
   }
   weather = weather.trim().toLowerCase();
@@ -463,6 +490,8 @@ export function loadConfig(argv: string[]): Config {
     city: city.trim() || undefined,
     weather: (weather as Weather) || undefined,
     realTimeSky,
+    meetingScreenUrl,
+    meetingScreenPort: screenPort,
   };
 }
 

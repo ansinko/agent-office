@@ -62,3 +62,11 @@ test('TURN servers come from --turn and from AGENT_OFFICE_TURN', (t) => {
     { urls: 'turns:relay.example.com:5349' },
   ]);
 });
+
+test("the meeting room screen's apps are served on the office's port + 10 unless told otherwise, never on the office's own", (t) => {
+  assert.equal(load(t, '--port', '4700').meetingScreenPort, 4710);
+  assert.equal(load(t, '--port', '4700', '--meeting-screen-port', '4800').meetingScreenPort, 4800);
+  assert.throws(() => load(t, '--port', '4700', '--meeting-screen-port', '4700'), /exit 2: .*--meeting-screen-port/);
+  assert.throws(() => load(t, '--meeting-screen-port', 'x'), /exit 2: .*--meeting-screen-port/);
+  assert.equal(load(t, '--meeting-screen-url', 'http://127.0.0.1:3000').meetingScreenUrl, 'http://127.0.0.1:3000');
+});

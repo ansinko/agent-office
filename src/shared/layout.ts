@@ -195,6 +195,12 @@ export const MEETING_SEATS: DeskDef[] = (
 ).map(([x, z, rotY], i) => ({ id: `meeting-${i + 1}`, x, z, rotY, label: i === 0 ? 'Head of the table' : `Meeting chair ${i + 1}`, room: true }));
 /** The board on the meeting room's back (south) wall that shows the meeting's output file as it's written. */
 export const MEETING_BOARD = { x: MEETING_TABLE.x, y: 1.95, z: FLOOR.maxZ - 0.08, width: 3.6, height: 1.2 } as const;
+/**
+ * The screen on the meeting room's east wall, at the head of the table (see features/appscreen): its
+ * picture 2:1 like its snapshots, `y` its middle, its bottom clear of the table top and its bezel
+ * clear of the loft over it.
+ */
+export const MEETING_SCREEN = { x: FLOOR.maxX, y: 1.73, z: MEETING_TABLE.z, width: 3.33, height: 1.665, bezel: 0.08 } as const;
 
 /** Any place a worker can be by id: the seats (the back office's included), the board agents' kiosks and the meeting room's chairs. */
 export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
@@ -282,7 +288,8 @@ export const GONG = { x: 11.8, z: FLOOR.minZ + 0.75, width: 1.9, height: 2.45 } 
 export const PLANTS: readonly (readonly [x: number, z: number, scale: number])[] = [
   [-17.2, -12.2, 1.4],
   [17.2, -12.2, 1.5],
-  [17.2, 12.2, 1.3],
+  // By the meeting room's corner, against the back wall: clear of the screen, seen from the table.
+  [16.6, 12.45, 1.1],
   [-17.2, 8.5, 1.2],
   [14.2, -12.2, 1.1],
   [-6, 0, 1],

@@ -138,6 +138,9 @@ before(async () => {
   for (const args of [['init', '-q', '-b', 'main'], ['add', '.'], ['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'init']]) {
     execFileSync('git', args, { cwd: project });
   }
+  // The meeting room screen with no pages: nothing is snapshotted, or served, while the tests run.
+  mkdirSync(path.join(project, '.agent-office'), { recursive: true });
+  writeFileSync(path.join(project, '.agent-office', 'app-screen.json'), JSON.stringify({ pages: [], rotate: 0 }));
   // A client bundle of its own, so the test needn't build one.
   for (const page of ['index', 'login', 'claim', 'join', 'lite']) writeFileSync(path.join(publicDir, `${page}.html`), `<!doctype html><title>${page}</title>`);
   writeFileSync(path.join(publicDir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
@@ -267,7 +270,7 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-17), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet']);
+  assert.deepEqual(Object.keys(welcome).slice(-18), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'appScreen']);
 
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');

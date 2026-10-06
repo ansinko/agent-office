@@ -11,6 +11,7 @@ import { jukebox } from '../../features/jukebox/world';
 import { bookshelf } from '../../features/bookshelf/world';
 import { cabinet } from '../../features/cabinet/world';
 import { whiteboard } from '../../features/whiteboard/world';
+import { appScreen } from '../../features/appscreen/world';
 import { green, tee } from '../../features/golf/world';
 import { stack } from '../stack';
 import { tower } from '../tower';
@@ -66,6 +67,7 @@ function floorPlan() {
     signs,
     loft,
     meetingRoom,
+    appScreen,
     elevator,
     garageLift,
     gong,

@@ -2,6 +2,9 @@
 
 export type HostKind = 'github' | 'bitbucket';
 
+/** What each host is called where a person reads it. */
+export const HOST_NAMES: Record<HostKind, string> = { github: 'GitHub', bitbucket: 'Bitbucket' };
+
 /** The hosts the office knows, by the domain their remotes name. */
 const DOMAINS: Record<string, HostKind> = { 'github.com': 'github', 'bitbucket.org': 'bitbucket' };
 

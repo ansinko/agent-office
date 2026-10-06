@@ -5,7 +5,8 @@
 import type { Config } from '../config.js';
 import type { Auth } from '../auth.js';
 import type { Accounts } from '../accounts.js';
-import type { SignIns, GhAs } from '../signins.js';
+import type { SignIns } from '../signins.js';
+import type { HostAs } from '../hosts/types.js';
 import type { ModelCatalogue } from '../models.js';
 import type { Tailnet } from '../tailnet.js';
 import type { Team } from '../team.js';
@@ -163,7 +164,7 @@ export interface Navigation {
 export interface Gates {
   /**
    * A worker took on the issue keyed `n` (handed over from its window, or its card dropped on the desk):
-   * it moves to In progress on the board and is assigned on GitHub (see GitHub.claim), and comes off
+   * it moves to In progress on the board and is assigned on the tracker (see Tracker.claim), and comes off
    * the queue so nobody else is seated for it.
    */
   takeIssue(c: Client, floor: Floor, n: string): void;
@@ -179,8 +180,8 @@ export interface Gates {
    * are still there.
    */
   withFreshBase(c: Client, floor: Floor | Floor[], go: () => void): void;
-  /** Runs `go` with how the office acts on GitHub for `c`: as them, or as itself (no account, or an admin's choice). */
-  withGitHub(c: Client, go: (as: GhAs | undefined) => void, refused?: (why: string) => void): void;
+  /** Runs `go` with how the office acts on the floor's host for `c`: as them, or as itself (no account, or an admin's choice). */
+  withHost(c: Client, go: (as: HostAs | undefined) => void, refused?: (why: string) => void): void;
   /** Needs a Claude sign-in of its own when the worker it starts runs Claude. */
   claudeFor(provider: string | undefined): SignInKind | undefined;
 }

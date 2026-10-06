@@ -1,13 +1,13 @@
-// The floor's GitHub boards: refreshing them, and merging, commenting on, closing and labeling
-// issues and pull requests, as whoever asks (see withGitHub).
+// The floor's boards: refreshing them, and merging, commenting on, closing and labeling issues (on
+// its tracker) and pull requests (on its host), as whoever asks (see withHost).
 import type { BoardRef, GitHubClientMsg } from '../../../shared/protocol.js';
 import { GH_COMMENT_MAX, GH_LABEL_MAX, issueRef } from '../../../shared/protocol.js';
 import { issueKey, num, str } from '../../office/input.js';
 import { here } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
-export const issuesView: ViewPieces['issues'] = (_ctx, floor) => floor?.github.issues ?? { items: [], fetchedAt: 0, loading: false };
-export const pullsView: ViewPieces['pulls'] = (_ctx, floor) => floor?.github.pulls ?? { items: [], fetchedAt: 0, loading: false };
+export const issuesView: ViewPieces['issues'] = (_ctx, floor) => floor?.tracker.issues ?? { items: [], fetchedAt: 0, loading: false };
+export const pullsView: ViewPieces['pulls'] = (_ctx, floor) => floor?.host.pulls ?? { items: [], fetchedAt: 0, loading: false };
 
 /** The issue (by key) or pull request (by number) a message names, if it names one properly. */
 function refOf(msg: { kind?: unknown; key?: unknown; number?: unknown }): BoardRef | undefined {
@@ -24,7 +24,7 @@ const named = (ref: BoardRef) => (ref.kind === 'pull' ? `PR #${ref.number}` : `i
 
 export const githubHandlers = {
   'gh.refresh'(ctx, c) {
-    void ctx.floorOf(c)?.github.refresh();
+    void ctx.floorOf(c)?.refreshBoards();
   },
   'gh.merge'(ctx, c, msg) {
     const who = c.peer.name;
@@ -33,12 +33,12 @@ export const githubHandlers = {
     const method = str(msg.method, 40);
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !method) return;
     const failed = (error: string) => ctx.sendTo(c, { t: 'gh.merged', number: n, error });
-    void floor.github.repoInfo().then((repo) => {
+    void floor.host.repoInfo().then((repo) => {
       if (!repo.methods.some((m) => m.id === method)) return;
-      ctx.withGitHub(
+      ctx.withHost(
         c,
         (as) =>
-          void floor.github.merge(n, method, msg.deleteBranch === true, msg.auto === true, as).then((error) => {
+          void floor.host.merge(n, method, msg.deleteBranch === true, msg.auto === true, as).then((error) => {
             ctx.sendTo(c, { t: 'gh.merged', number: n, error });
             if (error) return;
             ctx.toastFloor(floor, msg.auto ? `${who} set PR #${n} to merge once its checks pass` : `🎉 ${who} merged PR #${n}`);
@@ -61,10 +61,10 @@ export const githubHandlers = {
       ctx.sendTo(c, { t: 'gh.commented', ...ref, error: invalid });
       return;
     }
-    ctx.withGitHub(
+    ctx.withHost(
       c,
       (as) =>
-        void floor.github.comment(ref, body, as).then((r) => {
+        void (ref.kind === 'issue' ? floor.tracker.comment(ref, body, as) : floor.host.comment(ref, body, as)).then((r) => {
           ctx.sendTo(c, { t: 'gh.commented', ...ref, ...r });
           if (r.comment) ctx.toastFloor(floor, `💬 ${who} commented on ${named(ref)}`);
         }),
@@ -77,13 +77,16 @@ export const githubHandlers = {
     const ref = refOf(msg);
     if (!floor || !ref) return;
     const failed = (error: string) => ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
-    void floor.github.repoInfo().then(({ reasons }) => {
+    // An issue's reasons come from its tracker; a pull request's close needs the host's repository info anyway.
+    const listed = ref.kind === 'issue' ? floor.tracker.reasons() : floor.host.repoInfo().then((r) => r.reasons);
+    void listed.then((reasons) => {
       // An issue closes for a reason the tracker lists, its first when none was picked.
       const reason = reasons.find((r) => r.id === msg.reason)?.id ?? reasons[0]?.id;
-      ctx.withGitHub(
+      const comment = str(msg.comment, 20000).trim() || undefined;
+      ctx.withHost(
         c,
         (as) =>
-          void floor.github.close(ref, { comment: str(msg.comment, 20000).trim() || undefined, reason, deleteBranch: msg.deleteBranch === true }, as).then((error) => {
+          void (ref.kind === 'issue' ? floor.tracker.close(ref.key, { comment, reason }, as) : floor.host.close(ref.number, { comment, deleteBranch: msg.deleteBranch === true }, as)).then((error) => {
             ctx.sendTo(c, { t: 'gh.closed', ...ref, error });
             if (error) return;
             if (ref.kind === 'pull') return ctx.toastFloor(floor, `${who} closed ${named(ref)} without merging`);
@@ -107,10 +110,10 @@ export const githubHandlers = {
       ctx.sendTo(c, { t: 'gh.labeled', ...ref, error: 'No labels to change' });
       return;
     }
-    ctx.withGitHub(
+    ctx.withHost(
       c,
       (as) =>
-        void floor.github.setLabels(ref, add, remove, as).then((r) => {
+        void (ref.kind === 'issue' ? floor.tracker.setLabels(ref.key, add, remove, as) : floor.host.setLabels(ref.number, add, remove, as)).then((r) => {
           ctx.sendTo(c, { t: 'gh.labeled', ...ref, ...r });
           if (r.labels) ctx.toastFloor(floor, `🏷️ ${who} labeled ${named(ref)}: ${[...add.map((l) => `+${l}`), ...remove.map((l) => `−${l}`)].join(' ')}`);
         }),

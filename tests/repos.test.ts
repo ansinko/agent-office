@@ -10,6 +10,7 @@ import { landedWorkers } from '../src/server/leave-on-merge.js';
 import { Ledger } from '../src/server/usage.js';
 import { WorkerManager, relatedBlock, withRelated, workspaceNames, type RepoSource, type WorkerEvents } from '../src/server/workers.js';
 import { Worktrees } from '../src/server/worktrees.js';
+import { HOSTS } from '../src/server/hosts/registry.js';
 import type { ChangesState, GhPull, WorkerInfo } from '../src/shared/protocol.js';
 
 // A worker across repositories (WorkerInfo.repos): hired on one floor with other floors' projects,
@@ -280,11 +281,11 @@ test('O opens a pull request in each repository with commits, and each one lists
 });
 
 test('the list of related pull requests goes in once and is replaced after', () => {
-  const block = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }, { repo: 'api', url: 'https://github.com/acme/api/pull/9' }], 'https://github.com/acme/api/pull/9', 'office/pip-1');
+  const block = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }, { repo: 'api', url: 'https://github.com/acme/api/pull/9' }], 'https://github.com/acme/api/pull/9', 'office/pip-1', HOSTS.github!.pulls('/tmp', () => {}));
   assert.match(block, /- \*\*web\*\*: acme\/web#3\n- \*\*api\*\*: acme\/api#9 \(this one\)/);
   const once = withRelated('## Task\n\nDo it\n', block);
   assert.equal(once, `## Task\n\nDo it\n\n${block}`);
-  const newer = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }], 'x', 'office/pip-1');
+  const newer = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }], 'x', 'office/pip-1', HOSTS.github!.pulls('/tmp', () => {}));
   assert.equal(withRelated(`${once}\n\nsigned`, newer), `## Task\n\nDo it\n\n${newer}\n\nsigned`);
   assert.equal(withRelated('', block), block);
 });

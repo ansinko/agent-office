@@ -9,7 +9,7 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { TOOLS, UsageError, buildRequest, formatHome, formatLinked, formatWorkers, handleMcp, main, parseArgs } from '../bin/office-workers.js';
 import { codexMcpArgs, findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow } from '../src/server/office-workers.js';
-import { ownPr } from '../src/server/workers/pr.js';
+import { HOSTS } from '../src/server/hosts/registry.js';
 import { notLeaving } from '../src/server/leave-on-merge.js';
 import type { GhPull, WorkerInfo } from '../src/shared/protocol.js';
 
@@ -244,6 +244,8 @@ test('a worker in the main checkout has the pull request it opened itself', () =
   assert.deepEqual([both.pr?.number, both.pr?.state, both.merged], [8, 'open', false]);
 
   // What `gh pr create` printed, alone or at the end of a longer line; the one its branch already had counts too.
+  const github = HOSTS.github!.pulls('/tmp', () => {});
+  const ownPr = (command: unknown, output: string) => github.ownPr(command, output);
   const url = 'https://github.com/acme/app/pull/12';
   assert.deepEqual(ownPr('gh pr create --title "Fix it" --body "Closes #4"', `${url}\n`), { repo: 'acme/app', number: 12, url });
   assert.deepEqual(ownPr('cd ../wt && git push -u origin fix-it 2>&1 | tail -1; gh pr create --fill', `remote: https://github.com/acme/app/pull/new/fix-it\n${url}`), { repo: 'acme/app', number: 12, url });
@@ -256,16 +258,17 @@ test('a worker in the main checkout has the pull request it opened itself', () =
 });
 
 test('reads a request to say which pull request is whose', () => {
-  assert.deepEqual(readPrRequest({ pr: 12 }), { pr: 12 });
-  assert.deepEqual(readPrRequest({ pr: ' #12 ', worker: ' Bolt ' }), { worker: 'Bolt', pr: 12 });
-  assert.deepEqual(readPrRequest({ pr: 'https://github.com/acme/app/pull/12/files', worker: 'Bolt' }), { worker: 'Bolt', pr: 12, repo: 'acme/app' });
-  assert.deepEqual(readPrRequest({ unlink: true, worker: 'Bolt' }), { worker: 'Bolt' });
-  assert.deepEqual(readPrRequest({ unlink: true }), {});
-  assert.match(readPrRequest({}) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 0 }) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 'https://github.com/acme/app/issues/12' }) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 12, unlink: true }) as string, /not both/);
-  assert.match(readPrRequest({ pr: 12, worker: 7 }) as string, /worker is a worker name or id/);
+  const github = HOSTS.github!.pulls('/tmp', () => {});
+  assert.deepEqual(readPrRequest({ pr: 12 }, github), { pr: 12 });
+  assert.deepEqual(readPrRequest({ pr: ' #12 ', worker: ' Bolt ' }, github), { worker: 'Bolt', pr: 12 });
+  assert.deepEqual(readPrRequest({ pr: 'https://github.com/acme/app/pull/12/files', worker: 'Bolt' }, github), { worker: 'Bolt', pr: 12, repo: 'acme/app' });
+  assert.deepEqual(readPrRequest({ unlink: true, worker: 'Bolt' }, github), { worker: 'Bolt' });
+  assert.deepEqual(readPrRequest({ unlink: true }, github), {});
+  assert.match(readPrRequest({}, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 0 }, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 'https://github.com/acme/app/issues/12' }, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 12, unlink: true }, github) as string, /not both/);
+  assert.match(readPrRequest({ pr: 12, worker: 7 }, github) as string, /worker is a worker name or id/);
 });
 
 test('finds a worker by id or name, and says who there is when it cannot', () => {

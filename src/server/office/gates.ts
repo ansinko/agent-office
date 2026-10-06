@@ -1,22 +1,22 @@
 import { WebSocket } from 'ws';
-import type { GhAs } from '../signins.js';
+import type { HostAs } from '../hosts/types.js';
 import type { Floor } from '../floor.js';
 import { issueRef, type SignInKind } from '../../shared/protocol.js';
 import type { Ctx, Gates } from './context.js';
 import type { Client } from './client.js';
 
-/** What has to be true before something happens for someone: a sign-in of their own, a fresh base, GitHub. */
+/** What has to be true before something happens for someone: a sign-in of their own, a fresh base, the host. */
 export function gates(ctx: Ctx): Gates {
   /**
    * A worker took on the issue keyed `n` (handed over from its window, or its card dropped on the desk):
-   * it moves to In progress on the board and is assigned on GitHub (see GitHub.claim), and comes off
+   * it moves to In progress on the board and is assigned on the tracker (see Tracker.claim), and comes off
    * the queue so nobody else is seated for it.
    */
   const takeIssue = (c: Client, floor: Floor, n: string) => {
     floor.queue.dropIssue(n);
     const as = c.accountId ? ctx.signins.ghAs(c.accountId) : undefined;
     if (typeof as === 'string') return ctx.warn(c, `Couldn't assign issue ${issueRef(n)} on GitHub: ${as}`);
-    void floor.github.claim(n, as).then((err) => ctx.warn(c, err && `Couldn't assign issue ${issueRef(n)} on GitHub: ${err}`));
+    void floor.tracker.claim(n, as).then((err) => ctx.warn(c, err && `Couldn't assign issue ${issueRef(n)} on GitHub: ${err}`));
   };
 
   /**
@@ -52,8 +52,8 @@ export function gates(ctx: Ctx): Gates {
       go();
     });
   };
-  /** Runs `go` with how the office acts on GitHub for `c`: as them, or as itself (no account, or an admin's choice). */
-  const withGitHub = (c: Client, go: (as: GhAs | undefined) => void, refused?: (why: string) => void) =>
+  /** Runs `go` with how the office acts on the floor's host for `c`: as them, or as itself (no account, or an admin's choice). */
+  const withHost = (c: Client, go: (as: HostAs | undefined) => void, refused?: (why: string) => void) =>
     withSignIn(
       c,
       'github',
@@ -68,5 +68,5 @@ export function gates(ctx: Ctx): Gates {
   /** Needs a Claude sign-in of its own when the worker it starts runs Claude. */
   const claudeFor = (provider: string | undefined): SignInKind | undefined => (provider === 'claude' ? 'claude' : undefined);
 
-  return { takeIssue, withSignIn, withFreshBase, withGitHub, claudeFor };
+  return { takeIssue, withSignIn, withFreshBase, withHost, claudeFor };
 }

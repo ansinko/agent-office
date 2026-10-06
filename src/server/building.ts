@@ -6,7 +6,7 @@ import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/f
 import { parseRemote, type Remote } from '../shared/hosts.js';
 import type { CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
 import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
-import { gh } from './github.js';
+import { gh } from './hosts/github/gh.js';
 
 /** A floor as floors.json keeps it. */
 export interface FloorDef {

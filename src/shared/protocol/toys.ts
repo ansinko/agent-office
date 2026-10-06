@@ -6,6 +6,7 @@ import type { DogState } from '../dog.js';
 import type { CarSeat, CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
+import type { SpotifyState } from '../spotify.js';
 import type { WbElement, WbPointer } from '../whiteboard.js';
 
 export type DecorClientMsg =
@@ -21,6 +22,15 @@ export type JukeboxClientMsg =
   /** On to the next tune. */
   | { t: 'jukebox.skip' }
   | { t: 'jukebox.stop' };
+
+export type SpotifyClientMsg =
+  /** What the office machine's Spotify app is playing; the office answers with `spotify`. */
+  | { t: 'spotify.get' }
+  /** Play a spotify: URI or open.spotify.com link, or with none carry on; it turns the floor's jukebox off. */
+  | { t: 'spotify.play'; url?: string }
+  | { t: 'spotify.pause' }
+  | { t: 'spotify.next' }
+  | { t: 'spotify.prev' };
 
 export type CabinetClientMsg =
   /**
@@ -84,6 +94,8 @@ export type ToysServerMsg =
   /** Someone in a car on your floor honked its horn. */
   | { t: 'car.honk'; car: number }
   | { t: 'jukebox'; state: JukeboxState }
+  /** To you alone: what the office machine's Spotify app is playing, or null when it's not yours to play (no app there, or you're no admin). */
+  | { t: 'spotify'; state: SpotifyState | null }
   /** Who's at the arcade cabinet on your floor now, and the building's high scores. */
   | { t: 'cabinet'; state: CabinetState }
   /** The game on your floor's cabinet, as its player sees it (sent to everyone else on the floor). */

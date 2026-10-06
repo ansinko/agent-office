@@ -13,6 +13,7 @@ import { PlanLimitsReader } from '../limits.js';
 import { Webhook } from '../webhook.js';
 import { Machine } from '../machine.js';
 import { AppScreen } from '../appscreen/index.js';
+import { Spotify } from '../spotify.js';
 import { OFFICE_MAP } from '../../shared/maps/index.js';
 import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
@@ -141,8 +142,10 @@ export function createServices(ctx: Ctx): BuildingServices {
     changed: (state) => ctx.broadcast({ t: 'appScreen', state }),
   });
   appScreen.start();
+  // The Spotify app on this machine, for the jukebox: there only on a Mac that has it.
+  const spotify = new Spotify();
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, appScreen, limitsOf, pumpQueues };
+  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, appScreen, spotify, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

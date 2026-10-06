@@ -8,13 +8,21 @@ export interface GhLabel {
   description?: string;
 }
 
+/** A pull request's state; a draft is open but not ready for review. */
+export type PullState = 'open' | 'draft' | 'merged' | 'closed';
+/** Where its reviews leave a pull request: approved, changes requested, an approving review required, or nothing asked. */
+export type PullReview = 'approved' | 'changes' | 'pending' | 'none';
+/** Whether an open pull request can merge: conflicts with its base, a base it is behind, a rule or review in the way, checks still running, or not worked out yet. */
+export type Readiness = 'clean' | 'conflict' | 'behind' | 'blocked' | 'checks' | 'unknown';
+export type IssueState = 'open' | 'closed';
+
 export interface GhIssue {
   /** What the tracker calls it: GitHub's issue number ("12"), or a key like "ERN-123". */
   key: string;
   /** How it's shown: "#12" on GitHub. */
   ref: string;
   title: string;
-  state: string;
+  state: IssueState;
   url: string;
   author: string;
   labels: GhLabel[];
@@ -30,12 +38,11 @@ export interface GhIssue {
 export interface GhPull {
   number: number;
   title: string;
-  state: string;
-  isDraft: boolean;
+  state: PullState;
   url: string;
   author: string;
   labels: GhLabel[];
-  reviewDecision: string;
+  review: PullReview;
   headRefName: string;
   /** The commit its branch is at on GitHub (for a merged PR, the last one merged). */
   headRefOid?: string;
@@ -75,8 +82,8 @@ export interface GhComment {
   body: string;
   createdAt: string;
   url?: string;
-  /** Reviews only: APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED. */
-  state?: string;
+  /** Reviews only: what it decided; a review that only comments has none. */
+  review?: PullReview;
 }
 
 /** A comment on a line of a PR's diff. */
@@ -105,15 +112,11 @@ export interface GhCheck {
 export interface GhPullDetail {
   number: number;
   body: string;
-  state: string;
-  isDraft: boolean;
-  reviewDecision: string;
+  state: PullState;
+  review: PullReview;
   headRefName: string;
   baseRefName: string;
-  /** MERGEABLE, CONFLICTING or UNKNOWN (GitHub still working it out). */
-  mergeable: string;
-  /** CLEAN, BLOCKED, BEHIND, DIRTY, UNSTABLE, DRAFT, HAS_HOOKS or UNKNOWN. */
-  mergeStateStatus: string;
+  readiness: Readiness;
   commits: number;
   comments: GhComment[];
   reviews: GhComment[];
@@ -127,8 +130,7 @@ export interface GhPullDetail {
 /** GET /api/gh/issue?key=K */
 export interface GhIssueDetail {
   key: string;
-  /** OPEN or CLOSED. */
-  state: string;
+  state: IssueState;
   body: string;
   comments: GhComment[];
   /** See GhPullDetail.viewer. */

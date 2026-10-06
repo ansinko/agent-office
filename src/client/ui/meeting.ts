@@ -274,7 +274,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
 
   /** Keeps what depends on the board and the room up to date: the open PRs, and whether the room is free. */
   const refresh = () => {
-    const open = store.pulls.items.filter((p) => p.state === 'OPEN');
+    const open = store.pulls.items.filter((p) => p.state === 'open' || p.state === 'draft');
     const want = prSel.value || (preset?.pr ? String(preset.pr) : '');
     const opts: (readonly [string, string])[] = open.map((p) => [String(p.number), `#${p.number} ${p.title}`] as const);
     if (preset?.pr && !open.some((p) => p.number === preset.pr)) opts.unshift([String(preset.pr), `#${preset.pr}`]);

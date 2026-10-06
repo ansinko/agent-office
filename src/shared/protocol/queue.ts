@@ -1,6 +1,7 @@
 // The floor's task queue.
 
 import type { AgentEffort, AgentProvider } from './agents.js';
+import type { PullState } from './github.js';
 
 export type TaskStatus = 'queued' | 'running' | 'done';
 
@@ -32,7 +33,7 @@ export interface QueueTask {
   outcome?: 'done' | 'exited' | 'killed' | 'failed';
   error?: string;
   /** The pull request that closes the issue, or was opened from the worker's branch. */
-  pr?: { number: number; url: string; state: string; title: string };
+  pr?: { number: number; url: string; state: PullState; title: string };
 }
 
 export interface QueueState {

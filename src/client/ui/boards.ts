@@ -26,24 +26,24 @@ interface Column<T> {
 const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt);
 
 function issueColumns(items: GhIssue[]): Column<GhIssue>[] {
-  const open = items.filter((i) => i.state === 'OPEN');
+  const open = items.filter((i) => i.state === 'open');
   const started = open.filter((i) => inProgress(i, store.taskForIssue(i.key)));
   const todo = open.filter((i) => !started.includes(i));
   return [
     { key: 'open', title: '📥 Open', items: todo },
     { key: 'progress', title: '🚧 In progress', items: started },
-    { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'OPEN').sort(byUpdated), max: 40 },
+    { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'open').sort(byUpdated), max: 40 },
   ];
 }
 
 function pullColumns(items: GhPull[]): Column<GhPull>[] {
-  const open = items.filter((p) => p.state === 'OPEN');
+  const open = items.filter((p) => p.state === 'open');
   return [
-    { key: 'draft', title: '✏️ Draft', items: open.filter((p) => p.isDraft) },
-    { key: 'review', title: '👀 In review', items: open.filter((p) => !p.isDraft && p.reviewDecision !== 'APPROVED') },
-    { key: 'approved', title: '👍 Approved', items: open.filter((p) => !p.isDraft && p.reviewDecision === 'APPROVED') },
-    { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'MERGED').sort(byUpdated), max: 30 },
-    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'CLOSED').sort(byUpdated), max: 20 },
+    { key: 'draft', title: '✏️ Draft', items: items.filter((p) => p.state === 'draft') },
+    { key: 'review', title: '👀 In review', items: open.filter((p) => p.review !== 'approved') },
+    { key: 'approved', title: '👍 Approved', items: open.filter((p) => p.review === 'approved') },
+    { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'merged').sort(byUpdated), max: 30 },
+    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'closed').sort(byUpdated), max: 20 },
   ];
 }
 
@@ -277,7 +277,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
                 w ? deskChip(w) : '',
                 ...labelChips(it.labels),
                 `by ${it.author}`,
-                it.reviewDecision === 'CHANGES_REQUESTED' ? '🛠 changes requested' : '',
+                it.review === 'changes' ? '🛠 changes requested' : '',
                 CHECK_ICON[it.checks],
                 h('span', { style: 'color:#2a9d4b' }, `+${it.additions}`),
                 h('span', { style: 'color:#c3423f' }, `-${it.deletions}`),

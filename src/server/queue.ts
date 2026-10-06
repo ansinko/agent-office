@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { isAgentProvider, issueKey, issueRef, type AgentChoice, type AgentEffort, type AgentProvider, type GhPull, type QueueState, type QueueTask, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
+import { isAgentProvider, issueKey, issueRef, type AgentChoice, type AgentEffort, type AgentProvider, type GhPull, type PullState, type QueueState, type QueueTask, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { DESK_BY_ID, SEATS, nextFreeSeat } from '../shared/layout.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { savedEffort, savedModel, takesEffort, takesModel } from '../shared/providers.js';
@@ -204,7 +204,7 @@ export class TaskQueue {
         .filter((p) => (t.branch && p.headRefName === t.branch) || (t.issue !== undefined && p.closes.includes(t.issue) && Date.parse(p.createdAt) >= since))
         .sort((a, b) => Number(b.headRefName === t.branch) - Number(a.headRefName === t.branch) || b.createdAt.localeCompare(a.createdAt))[0];
       if (!match) continue;
-      const pr = { number: match.number, url: match.url, state: match.isDraft ? 'DRAFT' : match.state, title: match.title };
+      const pr = { number: match.number, url: match.url, state: match.state, title: match.title };
       if (t.pr && t.pr.number === pr.number && t.pr.state === pr.state && t.pr.title === pr.title) continue;
       t.pr = pr;
       changed = true;
@@ -403,7 +403,7 @@ export class TaskQueue {
           finishedAt: s.finishedAt,
           outcome: s.outcome,
           error: s.error,
-          pr: s.pr,
+          pr: savedPr(s.pr),
         };
         // Whatever was running died with the old office process; its worker comes back asleep at best.
         if (t.status === 'running') {
@@ -418,6 +418,15 @@ export class TaskQueue {
       // corrupt state file: start with an empty queue
     }
   }
+}
+
+const PULL_STATES = new Set<unknown>(['open', 'draft', 'merged', 'closed'] satisfies PullState[]);
+
+/** A task's pull request as queue.json kept it; one saved before neutral states has GitHub's (OPEN, DRAFT, MERGED, CLOSED). */
+function savedPr(raw: QueueTask['pr']): QueueTask['pr'] {
+  if (!raw) return undefined;
+  const state = String(raw.state).toLowerCase();
+  return { ...raw, state: PULL_STATES.has(state) ? (state as PullState) : 'open' };
 }
 
 function label(t: QueueTask): string {

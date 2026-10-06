@@ -2,9 +2,10 @@ import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
 import { gh } from '../github.js';
+import { pullState } from '../hosts/github/map.js';
 import type { Floor } from '../floor.js';
 import { nextFreeSeat } from '../../shared/layout.js';
-import { issueRef, type WorkerInfo } from '../../shared/protocol.js';
+import { issueRef, type PullState, type WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
@@ -17,17 +18,18 @@ async function pullOf(floor: Floor, n: number, repo?: string): Promise<{ number:
   const here = floor.def.repo;
   if (repo && here && repo.toLowerCase() !== here.toLowerCase()) return `That pull request is in ${repo}, and this floor is ${here}`;
   const listed = floor.github.pulls.items.find((p) => p.number === n);
-  let pr: { url: string; state: string } | undefined = listed;
+  let pr: { url: string; state: PullState } | undefined = listed;
   if (!pr) {
     try {
-      pr = JSON.parse(await gh(['pr', 'view', String(n), '--json', 'url,state'], floor.dir)) as { url: string; state: string };
+      const raw = JSON.parse(await gh(['pr', 'view', String(n), '--json', 'url,state'], floor.dir)) as { url: string; state: string };
+      pr = { url: raw.url, state: pullState(raw.state, false) };
     } catch (err) {
       return `No pull request #${n} here: ${(err as Error).message}`;
     }
   }
-  if (pr.state === 'CLOSED') return `PR #${n} was closed without merging`;
+  if (pr.state === 'closed') return `PR #${n} was closed without merging`;
   // The office follows the open ones and the last ones merged: an older one would look open for good.
-  if (!listed && pr.state === 'MERGED') return `PR #${n} merged too long ago for the office to follow: send the worker home by name instead`;
+  if (!listed && pr.state === 'merged') return `PR #${n} merged too long ago for the office to follow: send the worker home by name instead`;
   return { number: n, url: pr.url };
 }
 

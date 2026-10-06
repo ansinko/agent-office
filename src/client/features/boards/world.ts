@@ -97,7 +97,7 @@ export class BoardTexture {
       g.fillStyle = rnd() > 0.5 ? 'rgba(120,70,30,.18)' : 'rgba(255,240,210,.18)';
       g.fillRect(rnd() * W, rnd() * H, 3, 3);
     }
-    const open = (state.items as (GhIssue | GhPull)[]).filter((i) => i.state === 'OPEN');
+    const open = (state.items as (GhIssue | GhPull)[]).filter((i) => i.state === 'open' || i.state === 'draft');
     if (!open.length) {
       const note = state.error ? `⚠️ ${state.error}` : state.loading && !state.fetchedAt ? 'Loading…' : this.kind === 'issues' ? 'No open issues 🎉' : 'No open PRs';
       g.font = '800 40px Nunito, ui-rounded, system-ui, sans-serif';
@@ -139,7 +139,7 @@ export class BoardTexture {
       if (lifted) g.scale(1.06, 1.06);
       g.fillStyle = lifted ? 'rgba(0,0,0,.32)' : 'rgba(0,0,0,.25)';
       g.fillRect(-nw / 2 + (lifted ? 12 : 5), -nh / 2 + (lifted ? 16 : 7), nw, nh);
-      const draft = this.kind === 'pulls' && (it as GhPull).isDraft;
+      const draft = it.state === 'draft';
       g.fillStyle = draft ? '#e9ecef' : NOTE_COLORS[seed % NOTE_COLORS.length];
       g.fillRect(-nw / 2, -nh / 2, nw, nh);
       if (lifted) {
@@ -304,7 +304,7 @@ export class QueueBoardTexture {
       ...done.map((t) => ({
         icon: t.outcome === 'done' ? '✅' : '⚠️',
         text: name(t),
-        side: t.pr ? `PR #${t.pr.number}${t.pr.state === 'MERGED' ? ' · merged' : ''}` : t.outcome === 'done' ? 'done' : t.outcome === 'failed' ? "didn't start" : t.outcome === 'killed' ? 'sent home' : 'stopped',
+        side: t.pr ? `PR #${t.pr.number}${t.pr.state === 'merged' ? ' · merged' : ''}` : t.outcome === 'done' ? 'done' : t.outcome === 'failed' ? "didn't start" : t.outcome === 'killed' ? 'sent home' : 'stopped',
         color: '#8a8f98',
       })),
     ];

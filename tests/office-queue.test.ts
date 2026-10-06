@@ -85,7 +85,7 @@ test('lists the queue readably: id, status, title, worker and PR', () => {
     tasks: [
       { id: 'aaa111', title: 'Fix login', status: 'running', issue: '12', worker: 'Pixel', branch: 'office/pixel-1a2b' },
       { id: 'bbb222', title: 'Dark mode', status: 'queued' },
-      { id: 'ccc333', title: 'Rename the dog', status: 'done', outcome: 'done', worker: 'Byte', pr: { number: 9, url: 'https://github.com/o/r/pull/9', state: 'OPEN', title: 'x' } },
+      { id: 'ccc333', title: 'Rename the dog', status: 'done', outcome: 'done', worker: 'Byte', pr: { number: 9, url: 'https://github.com/o/r/pull/9', state: 'open', title: 'x' } },
       { id: 'ddd444', title: 'Broken', status: 'done', outcome: 'failed', error: 'no desk' },
     ],
   });

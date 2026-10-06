@@ -74,7 +74,7 @@ export interface FloorContext {
 
 /** The open pull request on a floor's board whose head is `branch`. */
 function openPull(floor: Floor, branch: string): { number: number; url: string } | undefined {
-  const pr = floor.github.pulls.items.find((p) => p.state === 'OPEN' && p.headRefName === branch);
+  const pr = floor.github.pulls.items.find((p) => (p.state === 'open' || p.state === 'draft') && p.headRefName === branch);
   return pr ? { number: pr.number, url: pr.url } : undefined;
 }
 

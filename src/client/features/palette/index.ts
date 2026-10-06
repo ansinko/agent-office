@@ -112,7 +112,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
           icon: '🔀',
           kind: 'PR',
           title: `#${pr.number} ${pr.title}`,
-          detail: [pr.isDraft ? 'Draft' : pr.state.toLowerCase(), pr.headRefName, pr.author].join(' · '),
+          detail: [pr.state === 'draft' ? 'Draft' : pr.state, pr.headRefName, pr.author].join(' · '),
           open: () => openPull(pr, net, actions.boardActions()),
         }),
       );

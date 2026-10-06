@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { inProgress } from '../src/client/ui/github/progress.js';
 import type { GhIssue, QueueTask } from '../src/shared/protocol.js';
 
-const issue = (extra: Partial<GhIssue> = {}): GhIssue => ({ number: 7, title: 'Fix the door', state: 'OPEN', url: '', author: 'ada', labels: [], assignees: [], createdAt: '', updatedAt: '', body: '', comments: 0, ...extra });
+const issue = (extra: Partial<GhIssue> = {}): GhIssue => ({ number: 7, title: 'Fix the door', state: 'open', url: '', author: 'ada', labels: [], assignees: [], createdAt: '', updatedAt: '', body: '', comments: 0, ...extra });
 const task = (status: QueueTask['status']) => ({ id: 't1', title: '#7 Fix the door', issue: 7, status }) as QueueTask;
 
 test('an issue nobody has taken is not in progress', () => {

@@ -121,8 +121,8 @@ function landedAcross(w: WorkerInfo, own: WorkerPr | undefined, pulls: GhPull[],
     const theirs = (pullsOf?.(r.floor) ?? []).filter((p) => p.number === r.pr?.number || p.headRefName === r.branch);
     // Opened from its desk, but its floor doesn't list it (yet, or any more): can't tell.
     if (r.pr && !theirs.some((p) => p.number === r.pr!.number)) return undefined;
-    if (theirs.some((p) => p.state === 'OPEN' || p.state === 'DRAFT')) return undefined;
-    const merged = theirs.find((p) => p.state === 'MERGED');
+    if (theirs.some((p) => p.state === 'open' || p.state === 'draft')) return undefined;
+    const merged = theirs.find((p) => p.state === 'merged');
     if (!merged) continue;
     heads[r.floor] = merged.headRefOid;
     prs.push(`${r.name} #${merged.number}`);

@@ -25,8 +25,8 @@ function worker(id: string, more: Partial<WorkerInfo> = {}): WorkerInfo {
   };
 }
 
-const pull = (number: number, state: string, headRefName: string, headRefOid?: string): GhPull => ({
-  number, title: `PR ${number}`, state, isDraft: false, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], reviewDecision: '',
+const pull = (number: number, state: GhPull['state'], headRefName: string, headRefOid?: string): GhPull => ({
+  number, title: `PR ${number}`, state, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0, checks: 'none', body: '', closes: [],
 });
 
@@ -211,7 +211,7 @@ test('office-workers mcp serves a real client over stdio, as the worker', async 
 
 test("a worker's row says where its pull request stands, and whether it would go home by itself", () => {
   const head = 'a'.repeat(40);
-  const view = { pulls: [pull(7, 'MERGED', 'office/bolt', head), pull(8, 'OPEN', 'office/zed')], tasks: [] };
+  const view = { pulls: [pull(7, 'merged', 'office/bolt', head), pull(8, 'open', 'office/zed')], tasks: [] };
   const bolt = workerRow(worker('bolt', { task: { name: 'Login fix', summary: 'Fixed the redirect' } }), view, 'mochi');
   assert.deepEqual(bolt, {
     id: 'bolt', name: 'Bolt', kind: 'agent', desk: 'Desk 1', status: 'done', task: 'Login fix: Fixed the redirect', hiredBy: 'Ada', hiredAt: '1970-01-01T00:00:00.000Z',
@@ -230,7 +230,7 @@ test("a worker's row says where its pull request stands, and whether it would go
 });
 
 test('a worker in the main checkout has the pull request it opened itself', () => {
-  const view = { pulls: [pull(7, 'MERGED', 'fix-login', 'a'.repeat(40)), pull(8, 'OPEN', 'fix-logout')], tasks: [] };
+  const view = { pulls: [pull(7, 'merged', 'fix-login', 'a'.repeat(40)), pull(8, 'open', 'fix-logout')], tasks: [] };
   // Its branch is one the office never made: with nothing saying whose #7 is, it has no pull request.
   const pixel = worker('pixel', { worktree: undefined });
   assert.equal(workerRow(pixel, view).pr, undefined);

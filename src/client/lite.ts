@@ -324,8 +324,8 @@ $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
 
 function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
-  count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
-  count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
+  count('btn-issues', store.issues.items.filter((i) => i.state === 'open').length);
+  count('btn-pulls', store.pulls.items.filter((p) => p.state === 'open' || p.state === 'draft').length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
 }
 store.on('issues', renderNav);

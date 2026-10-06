@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import type { BoardRef, GhCheck, GhCloseReason, GhComment, GhIssue, GhIssueDetail, GhLabel, GhMergeMethod, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
+import { issueState, pullReview, pullState, readiness, reviewOf } from './hosts/github/map.js';
 import type { GhAs } from './signins.js';
 
 const REFRESH_MS = 90_000;
@@ -66,7 +67,7 @@ function commentsOf(raw: any[]): GhComment[] {
     body: String(c.body ?? ''),
     createdAt: c.createdAt ?? c.submittedAt ?? '',
     url: c.url,
-    state: c.state,
+    review: reviewOf(c.state),
   }));
 }
 
@@ -90,10 +91,10 @@ export class MergeWatch {
   /** A fresh list from GitHub: the pull requests that merged since the last look and haven't rung yet. */
   look(pulls: GhPull[]): GhPull[] {
     const open = this.open;
-    const merged = open ? pulls.filter((p) => p.state === 'MERGED' && open.has(p.number) && !this.rang.has(p.number)) : [];
+    const merged = open ? pulls.filter((p) => p.state === 'merged' && open.has(p.number) && !this.rang.has(p.number)) : [];
     // Once GitHub says it merged, it never shows as open again to ring twice.
-    for (const p of pulls) if (p.state === 'MERGED') this.rang.delete(p.number);
-    this.open = new Set(pulls.filter((p) => p.state === 'OPEN').map((p) => p.number));
+    for (const p of pulls) if (p.state === 'merged') this.rang.delete(p.number);
+    this.open = new Set(pulls.filter((p) => p.state === 'open' || p.state === 'draft').map((p) => p.number));
     return merged;
   }
 }
@@ -199,6 +200,7 @@ export class GitHub {
       me ?? this.viewer(),
     ]);
     const p = JSON.parse(view);
+    const review = pullReview(p.reviewDecision ?? '');
     const reviewComments: GhReviewComment[] = lines
       .split('\n')
       .filter((l) => l.trim())
@@ -217,17 +219,15 @@ export class GitHub {
     return {
       number: p.number,
       body: String(p.body ?? ''),
-      state: p.state,
-      isDraft: !!p.isDraft,
-      reviewDecision: p.reviewDecision ?? '',
+      state: pullState(p.state, !!p.isDraft),
+      review,
       headRefName: p.headRefName,
       baseRefName: p.baseRefName,
-      mergeable: p.mergeable ?? 'UNKNOWN',
-      mergeStateStatus: p.mergeStateStatus ?? 'UNKNOWN',
+      readiness: readiness(p.mergeable ?? 'UNKNOWN', p.mergeStateStatus ?? 'UNKNOWN', review),
       commits: (p.commits ?? []).length,
       comments: commentsOf(p.comments),
       // A line comment also makes an empty COMMENTED review; the comment itself is shown instead.
-      reviews: commentsOf(p.reviews).filter((r) => r.body.trim() || r.state !== 'COMMENTED'),
+      reviews: commentsOf((p.reviews ?? []).filter((r: any) => String(r.body ?? '').trim() || r.state !== 'COMMENTED')),
       reviewComments,
       checks: (p.statusCheckRollup ?? []).map(checkOf),
       repo,
@@ -314,7 +314,7 @@ export class GitHub {
     // A refresh already in flight was asked before it closed and can still list it as open, so look again shortly after.
     void refresh().then(() => {
       const items: (GhIssue | GhPull)[] = kind === 'issue' ? this.issues.items : this.pulls.items;
-      if (items.some((i) => itemArg(i) === n && i.state === 'OPEN')) setTimeout(() => void refresh(), 3000);
+      if (items.some((i) => itemArg(i) === n && (i.state === 'open' || i.state === 'draft'))) setTimeout(() => void refresh(), 3000);
     });
     return undefined;
   }
@@ -442,7 +442,7 @@ export class GitHub {
         key: String(i.number),
         ref: `#${i.number}`,
         title: i.title,
-        state: i.state,
+        state: issueState(i.state),
         url: i.url,
         author: i.author?.login ?? '',
         labels: labels(i.labels),
@@ -478,12 +478,11 @@ export class GitHub {
       const fetched: GhPull[] = all.map((p: any) => ({
         number: p.number,
         title: p.title,
-        state: p.state,
-        isDraft: !!p.isDraft,
+        state: pullState(p.state, !!p.isDraft),
         url: p.url,
         author: p.author?.login ?? '',
         labels: labels(p.labels),
-        reviewDecision: p.reviewDecision ?? '',
+        review: pullReview(p.reviewDecision ?? ''),
         headRefName: p.headRefName,
         headRefOid: typeof p.headRefOid === 'string' ? p.headRefOid : undefined,
         baseRefName: p.baseRefName,

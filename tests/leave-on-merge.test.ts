@@ -16,8 +16,8 @@ function worker(id: string, status: WorkerStatus = 'done', more: Partial<WorkerI
   };
 }
 
-const pull = (number: number, state: string, headRefName: string, headRefOid?: string): GhPull => ({
-  number, title: `PR ${number}`, state, isDraft: false, url: '', author: '', labels: [], reviewDecision: '',
+const pull = (number: number, state: GhPull['state'], headRefName: string, headRefOid?: string): GhPull => ({
+  number, title: `PR ${number}`, state, url: '', author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0,
   checks: 'none', body: '', closes: [],
 });
@@ -26,35 +26,36 @@ const ids = (workers: WorkerInfo[], pulls: GhPull[], tasks: QueueTask[] = []) =>
 
 test('a worker at rest whose pull request merged goes, with the head of what merged', () => {
   const head = 'a'.repeat(40);
-  assert.deepEqual(landedWorkers([worker('mochi')], [pull(7, 'MERGED', 'office/mochi', head)], []), [{ worker: worker('mochi'), pr: 7, head }]);
-  for (const status of ['idle', 'exited', 'offline'] as const) assert.deepEqual(ids([worker('mochi', status)], [pull(7, 'MERGED', 'office/mochi')]), ['mochi'], status);
+  assert.deepEqual(landedWorkers([worker('mochi')], [pull(7, 'merged', 'office/mochi', head)], []), [{ worker: worker('mochi'), pr: 7, head }]);
+  for (const status of ['idle', 'exited', 'offline'] as const) assert.deepEqual(ids([worker('mochi', status)], [pull(7, 'merged', 'office/mochi')]), ['mochi'], status);
 });
 
 test('a worker stays while its PR is open, a follow-up is open, or it has none', () => {
-  assert.deepEqual(ids([worker('a')], [pull(1, 'OPEN', 'office/a')]), []);
-  assert.deepEqual(ids([worker('a')], [pull(1, 'MERGED', 'office/a'), pull(2, 'OPEN', 'office/a')]), []);
-  assert.deepEqual(ids([worker('a')], [pull(1, 'CLOSED', 'office/a')]), []);
-  assert.deepEqual(ids([worker('a')], [pull(1, 'MERGED', 'office/someone-else')]), []);
+  assert.deepEqual(ids([worker('a')], [pull(1, 'open', 'office/a')]), []);
+  assert.deepEqual(ids([worker('a')], [pull(1, 'merged', 'office/a'), pull(2, 'open', 'office/a')]), []);
+  assert.deepEqual(ids([worker('a')], [pull(1, 'merged', 'office/a'), pull(2, 'draft', 'office/a')]), []);
+  assert.deepEqual(ids([worker('a')], [pull(1, 'closed', 'office/a')]), []);
+  assert.deepEqual(ids([worker('a')], [pull(1, 'merged', 'office/someone-else')]), []);
   // Opened from its desk but not on the list yet: open.
-  assert.deepEqual(ids([worker('a', 'done', { pr: { number: 9, url: '' } })], [pull(1, 'MERGED', 'office/a')]), []);
+  assert.deepEqual(ids([worker('a', 'done', { pr: { number: 9, url: '' } })], [pull(1, 'merged', 'office/a')]), []);
 });
 
 test('a worker stays while it works, waits on someone, opens a PR or has its terminal watched', () => {
-  const merged = [pull(1, 'MERGED', 'office/a')];
+  const merged = [pull(1, 'merged', 'office/a')];
   for (const status of ['starting', 'working', 'needs_input'] as const) assert.deepEqual(ids([worker('a', status)], merged), [], status);
   assert.deepEqual(ids([worker('a', 'done', { prOpening: true })], merged), []);
   assert.deepEqual(ids([worker('a', 'done', { viewers: ['Cody'] })], merged), []);
 });
 
 test('shells, board agents and the meeting table never go by pull request', () => {
-  const merged = [pull(1, 'MERGED', 'office/a')];
+  const merged = [pull(1, 'merged', 'office/a')];
   assert.deepEqual(ids([worker('a', 'done', { kind: 'shell' })], merged), []);
   assert.deepEqual(ids([worker('a', 'done', { deskId: 'station-pulls' })], merged), []);
   assert.deepEqual(ids([worker('a', 'done', { meeting: 'm1' })], merged), []);
 });
 
 test("a queue task's merged PR counts after it drops off GitHub's list", () => {
-  const task: QueueTask = { id: 't', title: 't', prompt: 't', addedBy: 'x', addedAt: 0, status: 'done', workerId: 'a', pr: { number: 4, url: '', state: 'MERGED', title: 't' } };
+  const task: QueueTask = { id: 't', title: 't', prompt: 't', addedBy: 'x', addedAt: 0, status: 'done', workerId: 'a', pr: { number: 4, url: '', state: 'merged', title: 't' } };
   assert.deepEqual(landedWorkers([worker('a', 'done', { worktree: undefined })], [], [task]), [{ worker: worker('a', 'done', { worktree: undefined }), pr: 4, head: undefined }]);
 });
 

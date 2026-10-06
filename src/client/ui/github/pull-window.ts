@@ -9,7 +9,7 @@ import { openClose } from './close';
 import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
 import { checksList, conflicted, mergeStatus, openMerge } from './merge';
-import { avatar, commentCard, errorBox, nodes, REVIEW_BADGE, spinnerRow, stateOf } from './pieces';
+import { avatar, commentCard, errorBox, nodes, REVIEW_BADGE, REVIEWED_BADGE, spinnerRow, stateOf } from './pieces';
 import { FILES_KEY, mergePref, pref, savePref, TAB_KEY } from './prefs';
 import { fixAndMergePrompt, fixConflictsPrompt, pullContext, pullVars, reviewPrompt, type BoardActions } from './prompts';
 import { buildTree, looksGenerated, parseDiff, renderFileDiff, renderThread, repliesOf, Reviewed, STATUS_WORD, treeOrder, type DiffFile, type TreeDir } from './pulldiff';
@@ -83,14 +83,14 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
       ...nodes(
       avatar(it.author),
       h('b', {}, it.author),
-      h('span', {}, it.state === 'MERGED' ? `merged ${commits} into` : `wants to merge ${commits} into`),
+      h('span', {}, it.state === 'merged' ? `merged ${commits} into` : `wants to merge ${commits} into`),
       h('code', {}, it.baseRefName),
       h('span', {}, 'from'),
       h('code', {}, it.headRefName),
       h('span.gh-pm', {}, h('span.add', {}, `+${it.additions}`), ' ', h('span.del', {}, `−${it.deletions}`)),
       ...it.labels.map(labelChip),
       labelButton('pull', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame())),
-      it.reviewDecision ? h('span.gh-badge', { class: REVIEW_BADGE[it.reviewDecision]?.[1] ?? '' }, it.reviewDecision === 'REVIEW_REQUIRED' ? 'review required' : (REVIEW_BADGE[it.reviewDecision]?.[0] ?? it.reviewDecision.toLowerCase())) : null,
+      it.review !== 'none' ? h('span.gh-badge', { class: REVIEW_BADGE[it.review]?.[1] ?? '' }, it.review === 'pending' ? 'review required' : (REVIEW_BADGE[it.review]?.[0] ?? it.review)) : null,
       ),
     );
     const done = files ? files.filter((f) => reviewed.mark(f) === 'reviewed').length : 0;
@@ -103,7 +103,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     conv.classList.toggle('hidden', tab !== 'conversation');
     filesPane.classList.toggle('hidden', tab !== 'files');
 
-    const isOpen = it.state === 'OPEN';
+    const isOpen = it.state === 'open' || it.state === 'draft';
     const conflicts = !!detail && conflicted(detail);
     const merge = h(conflicts ? 'button.btn' : 'button.btn.primary', { type: 'button', disabled: !detail, title: detail ? 'Merge this pull request' : 'Loading…' }, '🔀 Merge…');
     merge.addEventListener('click', () => detail && openMerge(it, detail, net, handToWorker, loadAll));
@@ -141,7 +141,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
     const replies = repliesOf(d.reviewComments);
     const items: { at: string; node: HTMLElement }[] = [
       ...d.comments.map((c) => ({ at: c.createdAt, node: commentCard(c, itemUrl, 'commented') })),
-      ...d.reviews.map((r) => ({ at: r.createdAt, node: commentCard(r, itemUrl, '', REVIEW_BADGE[r.state ?? ''] ?? [r.state?.toLowerCase() ?? 'reviewed', '']) })),
+      ...d.reviews.map((r) => ({ at: r.createdAt, node: commentCard(r, itemUrl, '', (r.review && REVIEW_BADGE[r.review]) || REVIEWED_BADGE) })),
       ...d.reviewComments
         .filter((c) => !c.replyTo)
         .map((c) => ({
@@ -167,9 +167,9 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
 
     const st = mergeStatus(d);
     const box = h('section.gh-mergebox', { class: st.cls }, h('div.gh-status', { class: st.cls }, h('span', {}, st.icon), st.text), d.checks.length ? checksList(d.checks) : null);
-    if (it.state === 'OPEN' && st.can) box.append(h('div.gh-mergebox-go', {}, h('button.btn.primary', { type: 'button', onclick: () => openMerge(it, d, net, handToWorker, loadAll) }, '🔀 Merge…')));
+    if (it.state === 'open' && st.can) box.append(h('div.gh-mergebox-go', {}, h('button.btn.primary', { type: 'button', onclick: () => openMerge(it, d, net, handToWorker, loadAll) }, '🔀 Merge…')));
     if (conflicted(d)) box.append(h('div.gh-mergebox-go', {}, h('button.btn.primary', { type: 'button', onclick: handToWorker }, '✨ New worker: fix conflicts & merge')));
-    else if (it.state === 'OPEN' && !st.can && !d.isDraft) box.append(h('div.gh-mergebox-go', {}, h('button.btn', { type: 'button', onclick: handToWorker }, '🤖 Have a worker fix it & merge')));
+    else if (it.state === 'open' && !st.can) box.append(h('div.gh-mergebox-go', {}, h('button.btn', { type: 'button', onclick: handToWorker }, '🤖 Have a worker fix it & merge')));
     thread.append(box);
   };
 
@@ -481,7 +481,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
         if (g !== generation) return;
         detail = d;
         comment.setViewer(d.viewer);
-        it = { ...it, state: d.state, isDraft: d.isDraft, reviewDecision: d.reviewDecision };
+        it = { ...it, state: d.state, review: d.review };
         // Line comments go into the diff, so draw it again with them.
         if (files) setupFiles();
       })
@@ -504,7 +504,7 @@ export function openPull(first: GhPull, net: Net, actions: BoardActions) {
   const unsub = store.on('pulls', () => {
     const fresh = store.pulls.items.find((p) => p.number === it.number);
     if (!fresh) return;
-    it = detail ? { ...fresh, state: fresh.state === 'OPEN' ? detail.state : fresh.state } : fresh;
+    it = detail && (fresh.state === 'open' || fresh.state === 'draft') && (detail.state === 'merged' || detail.state === 'closed') ? { ...fresh, state: detail.state } : fresh;
     renderFrame();
   });
   const modal: Modal = openModal(el, {

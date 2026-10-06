@@ -62,7 +62,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
     ),
   );
   const renderFrame = () => {
-    const isOpen = it.state === 'OPEN';
+    const isOpen = it.state === 'open';
     meta.replaceChildren(
       ...nodes(
         avatar(it.author),
@@ -112,7 +112,7 @@ export function openIssue(first: GhIssue, net: Net, actions: BoardActions) {
       const fresh = store.issues.items.find((i) => i.key === it.key);
       if (!fresh) return;
       // The board can lag behind a close made from here.
-      it = detail ? { ...fresh, state: fresh.state === 'OPEN' ? detail.state : fresh.state } : fresh;
+      it = detail ? { ...fresh, state: fresh.state === 'open' ? detail.state : fresh.state } : fresh;
       renderFrame();
     }),
     store.on('queue', renderFrame),

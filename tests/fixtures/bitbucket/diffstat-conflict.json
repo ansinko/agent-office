@@ -1,0 +1,59 @@
+{
+  "values": [
+    {
+      "type": "diffstat",
+      "lines_added": 10,
+      "lines_removed": 2,
+      "status": "modified",
+      "old": {
+        "path": "src/widget.ts",
+        "type": "commit_file",
+        "escaped_path": "src/widget.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/0123456789ab/src/widget.ts"
+          }
+        }
+      },
+      "new": {
+        "path": "src/widget.ts",
+        "type": "commit_file",
+        "escaped_path": "src/widget.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/abc123def456/src/widget.ts"
+          }
+        }
+      }
+    },
+    {
+      "type": "diffstat",
+      "lines_added": 3,
+      "lines_removed": 1,
+      "status": "merge conflict",
+      "old": {
+        "path": "src/shared.ts",
+        "type": "commit_file",
+        "escaped_path": "src/shared.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/0123456789ab/src/shared.ts"
+          }
+        }
+      },
+      "new": {
+        "path": "src/shared.ts",
+        "type": "commit_file",
+        "escaped_path": "src/shared.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/abc123def456/src/shared.ts"
+          }
+        }
+      }
+    }
+  ],
+  "pagelen": 500,
+  "size": 2,
+  "page": 1
+}

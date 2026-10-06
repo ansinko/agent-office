@@ -1,0 +1,385 @@
+{
+  "values": [
+    {
+      "comment_count": 0,
+      "task_count": 0,
+      "type": "pullrequest",
+      "id": 5,
+      "title": "Fix the example footer",
+      "description": "Example description for pull request 5.",
+      "state": "MERGED",
+      "draft": false,
+      "merge_commit": {
+        "hash": "444455556666",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/444455556666"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/commits/444455556666"
+          }
+        },
+        "type": "commit"
+      },
+      "close_source_branch": true,
+      "closed_by": {
+        "display_name": "Alex Example",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000001}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/1.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000001}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000001}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000001",
+        "nickname": "Alex Example"
+      },
+      "author": {
+        "display_name": "Alex Example",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000001}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/1.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000001}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000001}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000001",
+        "nickname": "Alex Example"
+      },
+      "reason": "",
+      "created_on": "2025-12-20T09:00:00.000000+00:00",
+      "updated_on": "2025-12-21T09:00:00.000000+00:00",
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "hash": "0123456789ab",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/0123456789ab"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo/commits/0123456789ab"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "example-team/example-repo",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo"
+            },
+            "avatar": {
+              "href": "https://example.com/avatar/repo.png"
+            }
+          },
+          "name": "example-repo",
+          "uuid": "{00000000-0000-4000-8000-0000000000aa}"
+        }
+      },
+      "source": {
+        "branch": {
+          "name": "fix/example-footer"
+        },
+        "commit": {
+          "hash": "111122223333",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/111122223333"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo/commits/111122223333"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "example-team/example-repo",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo"
+            },
+            "avatar": {
+              "href": "https://example.com/avatar/repo.png"
+            }
+          },
+          "name": "example-repo",
+          "uuid": "{00000000-0000-4000-8000-0000000000aa}"
+        }
+      },
+      "links": {
+        "commits": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/commits"
+        },
+        "approve": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/approve"
+        },
+        "request-changes": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/request-changes"
+        },
+        "diff": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/diff"
+        },
+        "diffstat": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/diffstat"
+        },
+        "comments": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/comments"
+        },
+        "activity": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/activity"
+        },
+        "merge": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/merge"
+        },
+        "decline": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/decline"
+        },
+        "statuses": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5/statuses"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/5"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/5"
+        }
+      },
+      "summary": {
+        "type": "rendered",
+        "raw": "Example description for pull request 5.",
+        "markup": "markdown",
+        "html": "<p>Example description for pull request 5.</p>"
+      },
+      "participants": [
+        {
+          "type": "participant",
+          "user": {
+            "display_name": "Robin Reviewer",
+            "links": {
+              "self": {
+                "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000003}"
+              },
+              "avatar": {
+                "href": "https://example.com/avatar/3.png"
+              },
+              "html": {
+                "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000003}/"
+              }
+            },
+            "type": "user",
+            "uuid": "{00000000-0000-4000-8000-000000000003}",
+            "account_id": "000000:00000000-0000-4000-8000-000000000003",
+            "nickname": "Robin Reviewer"
+          },
+          "role": "PARTICIPANT",
+          "approved": true,
+          "state": "approved",
+          "participated_on": "2026-01-02T10:00:00.000000+00:00"
+        }
+      ],
+      "queued": false
+    },
+    {
+      "comment_count": 0,
+      "task_count": 0,
+      "type": "pullrequest",
+      "id": 4,
+      "title": "Rename the sample module",
+      "description": "Example description for pull request 4.",
+      "state": "MERGED",
+      "draft": false,
+      "merge_commit": {
+        "hash": "aaaabbbbcccc",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/aaaabbbbcccc"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/commits/aaaabbbbcccc"
+          }
+        },
+        "type": "commit"
+      },
+      "close_source_branch": true,
+      "closed_by": {
+        "display_name": "Sam Sample",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000002}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/2.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000002}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000002}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000002",
+        "nickname": "Sam Sample"
+      },
+      "author": {
+        "display_name": "Sam Sample",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000002}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/2.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000002}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000002}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000002",
+        "nickname": "Sam Sample"
+      },
+      "reason": "",
+      "created_on": "2025-12-18T09:00:00.000000+00:00",
+      "updated_on": "2025-12-19T09:00:00.000000+00:00",
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "hash": "0123456789ab",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/0123456789ab"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo/commits/0123456789ab"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "example-team/example-repo",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo"
+            },
+            "avatar": {
+              "href": "https://example.com/avatar/repo.png"
+            }
+          },
+          "name": "example-repo",
+          "uuid": "{00000000-0000-4000-8000-0000000000aa}"
+        }
+      },
+      "source": {
+        "branch": {
+          "name": "chore/sample-rename"
+        },
+        "commit": {
+          "hash": "777788889999",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/commit/777788889999"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo/commits/777788889999"
+            }
+          },
+          "type": "commit"
+        },
+        "repository": {
+          "type": "repository",
+          "full_name": "example-team/example-repo",
+          "links": {
+            "self": {
+              "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo"
+            },
+            "html": {
+              "href": "https://bitbucket.org/example-team/example-repo"
+            },
+            "avatar": {
+              "href": "https://example.com/avatar/repo.png"
+            }
+          },
+          "name": "example-repo",
+          "uuid": "{00000000-0000-4000-8000-0000000000aa}"
+        }
+      },
+      "links": {
+        "commits": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/commits"
+        },
+        "approve": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/approve"
+        },
+        "request-changes": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/request-changes"
+        },
+        "diff": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/diff"
+        },
+        "diffstat": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/diffstat"
+        },
+        "comments": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/comments"
+        },
+        "activity": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/activity"
+        },
+        "merge": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/merge"
+        },
+        "decline": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/decline"
+        },
+        "statuses": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4/statuses"
+        },
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/4"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/4"
+        }
+      },
+      "summary": {
+        "type": "rendered",
+        "raw": "Example description for pull request 4.",
+        "markup": "markdown",
+        "html": "<p>Example description for pull request 4.</p>"
+      },
+      "participants": [],
+      "queued": false
+    }
+  ],
+  "pagelen": 2,
+  "size": 2,
+  "page": 1
+}

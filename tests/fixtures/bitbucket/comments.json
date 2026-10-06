@@ -1,0 +1,314 @@
+{
+  "values": [
+    {
+      "id": 101,
+      "created_on": "2026-01-03T08:00:00.000000+00:00",
+      "updated_on": "2026-01-03T08:00:00.000000+00:00",
+      "content": {
+        "type": "rendered",
+        "raw": "Looks fine overall, one question below.",
+        "markup": "markdown",
+        "html": "<p>Looks fine overall, one question below.</p>"
+      },
+      "user": {
+        "display_name": "Sam Sample",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000002}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/2.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000002}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000002}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000002",
+        "nickname": "Sam Sample"
+      },
+      "deleted": false,
+      "pending": false,
+      "type": "pullrequest_comment",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/101"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-101"
+        }
+      },
+      "pullrequest": {
+        "type": "pullrequest",
+        "id": 7,
+        "title": "Add the example widget",
+        "draft": false,
+        "queued": false,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7"
+          }
+        }
+      }
+    },
+    {
+      "id": 102,
+      "created_on": "2026-01-03T08:10:00.000000+00:00",
+      "updated_on": "2026-01-03T08:10:00.000000+00:00",
+      "content": {
+        "type": "rendered",
+        "raw": "This name reads oddly.",
+        "markup": "markdown",
+        "html": "<p>This name reads oddly.</p>"
+      },
+      "user": {
+        "display_name": "Robin Reviewer",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000003}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/3.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000003}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000003}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000003",
+        "nickname": "Robin Reviewer"
+      },
+      "deleted": false,
+      "pending": false,
+      "type": "pullrequest_comment",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/102"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-102"
+        }
+      },
+      "pullrequest": {
+        "type": "pullrequest",
+        "id": 7,
+        "title": "Add the example widget",
+        "draft": false,
+        "queued": false,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7"
+          }
+        }
+      },
+      "inline": {
+        "from": null,
+        "to": 12,
+        "path": "src/widget.ts",
+        "start_from": null,
+        "start_to": null
+      }
+    },
+    {
+      "id": 103,
+      "created_on": "2026-01-03T08:20:00.000000+00:00",
+      "updated_on": "2026-01-03T08:20:00.000000+00:00",
+      "content": {
+        "type": "rendered",
+        "raw": "Why was this line removed?",
+        "markup": "markdown",
+        "html": "<p>Why was this line removed?</p>"
+      },
+      "user": {
+        "display_name": "Robin Reviewer",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000003}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/3.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000003}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000003}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000003",
+        "nickname": "Robin Reviewer"
+      },
+      "deleted": false,
+      "pending": false,
+      "type": "pullrequest_comment",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/103"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-103"
+        }
+      },
+      "pullrequest": {
+        "type": "pullrequest",
+        "id": 7,
+        "title": "Add the example widget",
+        "draft": false,
+        "queued": false,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7"
+          }
+        }
+      },
+      "inline": {
+        "from": 4,
+        "to": null,
+        "path": "src/old.ts",
+        "start_from": null,
+        "start_to": null
+      }
+    },
+    {
+      "id": 104,
+      "created_on": "2026-01-03T08:30:00.000000+00:00",
+      "updated_on": "2026-01-03T08:30:00.000000+00:00",
+      "content": {
+        "type": "rendered",
+        "raw": "Renamed it.",
+        "markup": "markdown",
+        "html": "<p>Renamed it.</p>"
+      },
+      "user": {
+        "display_name": "Alex Example",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000001}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/1.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000001}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000001}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000001",
+        "nickname": "Alex Example"
+      },
+      "deleted": false,
+      "pending": false,
+      "type": "pullrequest_comment",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/104"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-104"
+        }
+      },
+      "pullrequest": {
+        "type": "pullrequest",
+        "id": 7,
+        "title": "Add the example widget",
+        "draft": false,
+        "queued": false,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7"
+          }
+        }
+      },
+      "inline": {
+        "from": null,
+        "to": 12,
+        "path": "src/widget.ts",
+        "start_from": null,
+        "start_to": null
+      },
+      "parent": {
+        "id": 102,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/102"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-102"
+          }
+        }
+      }
+    },
+    {
+      "id": 105,
+      "created_on": "2026-01-03T08:40:00.000000+00:00",
+      "updated_on": "2026-01-03T08:40:00.000000+00:00",
+      "content": {
+        "type": "rendered",
+        "raw": "",
+        "markup": "markdown",
+        "html": "<p></p>"
+      },
+      "user": {
+        "display_name": "Sam Sample",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/users/{00000000-0000-4000-8000-000000000002}"
+          },
+          "avatar": {
+            "href": "https://example.com/avatar/2.png"
+          },
+          "html": {
+            "href": "https://bitbucket.org/{00000000-0000-4000-8000-000000000002}/"
+          }
+        },
+        "type": "user",
+        "uuid": "{00000000-0000-4000-8000-000000000002}",
+        "account_id": "000000:00000000-0000-4000-8000-000000000002",
+        "nickname": "Sam Sample"
+      },
+      "deleted": true,
+      "pending": false,
+      "type": "pullrequest_comment",
+      "links": {
+        "self": {
+          "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7/comments/105"
+        },
+        "html": {
+          "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7/_/diff#comment-105"
+        }
+      },
+      "pullrequest": {
+        "type": "pullrequest",
+        "id": 7,
+        "title": "Add the example widget",
+        "draft": false,
+        "queued": false,
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/pullrequests/7"
+          },
+          "html": {
+            "href": "https://bitbucket.org/example-team/example-repo/pull-requests/7"
+          }
+        }
+      }
+    }
+  ],
+  "pagelen": 100,
+  "size": 5,
+  "page": 1
+}

@@ -30,7 +30,7 @@ export class GitHubIssues implements Tracker {
   async issueDetail(key: string, me?: string): Promise<GhIssueDetail> {
     const [view, viewer] = await Promise.all([gh(['issue', 'view', key, '--json', 'number,state,body,comments'], this.dir), me ?? this.host.viewer()]);
     const i = JSON.parse(view);
-    return { key: String(i.number), state: i.state, body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer, reasons: GITHUB_REASONS, caps: { labels: GITHUB_CAPS.labels } };
+    return { key: String(i.number), state: issueState(i.state), body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer, reasons: GITHUB_REASONS, caps: { labels: GITHUB_CAPS.labels } };
   }
 
   /** Comments on an issue, as `as` or else the office. Returns the comment as GitHub saved it, or why it couldn't. */

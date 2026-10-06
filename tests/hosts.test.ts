@@ -105,6 +105,8 @@ test('the GitHub adapter runs the gh commands the office ran before hosts', asyn
 
   const host = HOSTS.github!.pulls(dir, () => {});
   const tracker = HOSTS.github!.issues(dir, () => {}, host);
+  // The issue window takes its state from here: an open issue reads as open.
+  assert.equal((await tracker.issueDetail('12', 'me')).state, 'open');
   assert.deepEqual(await host.findPull(9), { url: 'https://github.com/acme/site/pull/9', state: 'merged' });
   assert.deepEqual(last('pr view'), ['pr', 'view', '9', '--json', 'url,state']);
 

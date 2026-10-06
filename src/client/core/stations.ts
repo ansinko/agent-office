@@ -10,6 +10,7 @@ export const STATION_INFO: Record<StationKind, { icon: string; offer: string; do
   issues: { icon: '📌', offer: 'Ask me about issues', does: 'I file, find, triage, label and close them', example: 'File an issue: the dog walks straight through the jukebox' },
   pulls: { icon: '🔀', offer: 'Ask me about PRs', does: 'I sum up, review, comment on and merge them', example: 'Review the newest PR and tell me if it’s ready to merge' },
   queue: { icon: '📋', offer: 'Ask me to queue work', does: 'I turn it into tasks for fresh workers', example: 'Queue every open bug issue, most important first' },
+  restroom: { icon: '🧻', offer: 'Have a seat and tell me', does: 'I turn your ideas into GitHub issues', example: 'The dog could fetch the newspaper every morning' },
 };
 
 /** A board agent waiting by its board before anyone has asked it anything (see buildKiosk), and where. */
@@ -18,18 +19,19 @@ export interface IdleAgent {
   view: DeskView;
 }
 
-/** The board agents waiting by their boards in `w`. */
+/** The agents waiting at the stations `w` has put up (World.desks), the board agents by their boards among them. */
 export function idleAgentsIn(w: World): IdleAgent[] {
-  return w.plan.stations.map((def) => {
+  return w.plan.stations.flatMap((def) => {
+    const view = w.desks.get(def.id);
+    if (!view) return [];
     const kind = def.station!;
     const agent = STATION_AGENT[kind];
     const model = new Worker(agent.name, agent.color);
     model.setStatus('idle', false);
     model.setTask({ name: STATION_INFO[kind].offer, summary: STATION_INFO[kind].does });
     model.setOutfit(w.plan.agents.outfit === 'peasant' ? 'peasant' : null);
-    const view = w.desks.get(def.id)!;
     view.vacancy.children[0].add(model.root);
     noOutline(model.root);
-    return { model, view };
+    return [{ model, view }];
   });
 }

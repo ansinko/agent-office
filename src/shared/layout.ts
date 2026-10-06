@@ -19,8 +19,6 @@ export interface DeskDef {
   station?: StationKind;
   /** A chair at the meeting room's table (see MEETING_SEATS): only a meeting seats a worker here. */
   room?: boolean;
-  /** A desk in the back office (see WING): there once the floor is built out this many rows. */
-  wing?: number;
 }
 
 const DESK_WIDTH = 2.2;
@@ -55,14 +53,12 @@ function buildDesks(): DeskDef[] {
 export const DESKS: DeskDef[] = buildDesks();
 
 /**
- * The back office: a bay knocked through the north wall between the gong and the east wall, for a
- * floor that needs more desks than the room has. Each time someone expands the floor (see
- * shared/floorplan.ts), its back wall goes another `row` meters north, with two more desks back to
- * back in the middle, up to `rows` times: any further and it would stand in the street behind the
- * building (world/city.ts). It runs from `minX` (the gong keeps its bit of wall) to the east wall,
- * and from the old north wall back to wingMinZ.
+ * The back office: a bay through the north wall between the gong and the east wall, one `row` deep,
+ * built on every floor. It is the restroom (see RESTROOM). It runs from `minX` (the gong keeps its bit
+ * of wall) to the east wall, and from the old north wall back to wingMinZ. The office's helpers still
+ * take a level for it, as `rows` on an office floor and 0 where there's none (the roof, a map of its own).
  */
-export const WING = { minX: 13.4, maxX: FLOOR.maxX, row: 4.6, rows: 2 } as const;
+export const WING = { minX: 13.4, maxX: FLOOR.maxX, row: 4.6, rows: 1 } as const;
 
 /** A floor built out `level` rows, as a whole number from 0 (just the room) to WING.rows. */
 export function wingLevel(level: unknown): number {
@@ -85,28 +81,26 @@ export function wingRowZ(row: number): number {
 }
 
 /**
- * The back office's desks: a back-to-back pair down the middle of each row, like half a pod, with
- * room to walk round either side. The far one's worker faces the room; the near one's faces the back.
+ * The restroom in the back office, x minX..maxX and z minZ..maxZ, behind the old north wall (`wall`
+ * thick, with the room's side at maxZ). Its door from the room is in that wall, `door.x` its middle.
+ * Inside by the door stands the hajzel baba's little table (`width` along x, `depth` along z), and she
+ * sits `chair` east of its middle facing the door (station-restroom). The cubicle fills the north-east
+ * corner from `cubicle.minX` and `cubicle.maxZ` to the walls, its door in its south wall, and the
+ * toilet stands against the back wall facing that door (the `toilet` seat). The sink, a mirror over
+ * it, is against the west wall.
  */
-export const WING_DESKS: DeskDef[] = Array.from({ length: WING.rows }, (_, i) => {
-  const z = wingRowZ(i + 1);
-  const x = (WING.minX + WING.maxX) / 2;
-  const n = DESKS.length + 2 * i + 1;
-  return [
-    { id: `desk-${n}`, x, z: z - DESK_DEPTH / 2, rotY: Math.PI, label: `Desk ${n}`, wing: i + 1 },
-    { id: `desk-${n + 1}`, x, z: z + DESK_DEPTH / 2, rotY: 0, label: `Desk ${n + 1}`, wing: i + 1 },
-  ];
-}).flat();
-
-/** Whether `desk` is there on a floor built out `level` rows: every desk in the room is. */
-export function deskBuilt(desk: DeskDef, level: number): boolean {
-  return !desk.wing || desk.wing <= level;
-}
-
-/** Every desk on a floor built out `level` rows: the room's, then the back office's. */
-export function builtDesks(level: number): DeskDef[] {
-  return [...DESKS, ...WING_DESKS.filter((d) => deskBuilt(d, level))];
-}
+export const RESTROOM = {
+  minX: WING.minX,
+  maxX: WING.maxX,
+  minZ: FLOOR.minZ - WING.row,
+  maxZ: FLOOR.minZ,
+  wall: 0.3,
+  door: { x: 14.3, width: 1.1, height: 2.2 },
+  table: { x: 15.4, z: FLOOR.minZ - 0.9, width: 0.5, depth: 0.8, height: 0.72, chair: 0.65 },
+  cubicle: { minX: 16.4, maxZ: FLOOR.minZ - WING.row + 2, wall: 0.08, height: 2.1, door: { x: 17.25, width: 0.8 } },
+  toilet: { x: 17.25, z: FLOOR.minZ - WING.row + 0.4, r: 0.3 },
+  sink: { x: WING.minX + 0.25, z: FLOOR.minZ - 3.3, width: 0.6, depth: 0.5, height: 0.85 },
+} as const;
 
 /**
  * Overflow seats: once every desk is taken, bean bags come out around the room, one at a time in
@@ -132,16 +126,20 @@ export const BEANBAGS: DeskDef[] = (
   ] as const
 ).map(([x, z, rotY], i) => ({ id: `beanbag-${i + 1}`, x, z, rotY, label: `Bean bag ${i + 1}`, beanbag: true }));
 
-/** Everywhere a worker can sit: the desks, the back office's once it's built out (see deskBuilt), then the bean bags. */
-export const SEATS: DeskDef[] = [...DESKS, ...WING_DESKS, ...BEANBAGS];
+/** Everywhere a worker can sit: the desks, then the bean bags. */
+export const SEATS: DeskDef[] = [...DESKS, ...BEANBAGS];
 
 /** The boards with an agent standing by: the Issues board, the PR board and the task queue. */
-export type StationKind = 'issues' | 'pulls' | 'queue';
+export type BoardStationKind = 'issues' | 'pulls' | 'queue';
+/** The office's own agents: the board agents, and the hajzel baba in the restroom. */
+export type StationKind = BoardStationKind | 'restroom';
 
 /**
- * The board agents: a worker standing behind a little kiosk just west of each of those boards (see
- * BOARDS), there for anyone to prompt about it. (x, z) is the kiosk. They face into the room, so at
- * rotY PI the worker stands on the wall side of it. Nobody hires them from the desks or the queue.
+ * The office's own agents: the board agents, a worker standing behind a little kiosk just west of each
+ * of those boards (see BOARDS), there for anyone to prompt about it, and the hajzel baba at her table
+ * in the restroom. (x, z) is the kiosk or the table, and the worker is on its rotY side (deskSeat): the
+ * board agents face into the room, so at rotY PI they stand on the wall side. Nobody hires them from
+ * the desks or the queue.
  */
 export const STATIONS: DeskDef[] = [
   // Between the plant in the north-west corner and the Issues board.
@@ -150,7 +148,11 @@ export const STATIONS: DeskDef[] = [
   { id: 'station-pulls', station: 'pulls', x: 0, z: FLOOR.minZ + 1.3, rotY: Math.PI, label: 'PR board' },
   // Between the Issues board and the task queue.
   { id: 'station-queue', station: 'queue', x: -7.8, z: FLOOR.minZ + 1.3, rotY: Math.PI, label: 'Task queue' },
+  // At her table in the restroom, facing the door: (x, z) is the table. Only whoever sits on the toilet talks to her.
+  { id: 'station-restroom', station: 'restroom', x: RESTROOM.table.x, z: RESTROOM.table.z, rotY: Math.PI / 2, label: 'Restroom' },
 ];
+/** The board agents' stations, each with a kiosk: every station but the restroom's. */
+export const KIOSK_STATIONS: DeskDef[] = STATIONS.filter((d) => d.station !== 'restroom');
 /** A board agent's kiosk: its top, and how far behind its middle (toward the wall) the agent stands. */
 export const KIOSK = { width: 0.8, depth: 0.5, height: 0.55, stand: 0.55 } as const;
 /** Each board agent's name and its color, the same whenever it's hired. */
@@ -158,6 +160,7 @@ export const STATION_AGENT: Record<StationKind, { name: string; color: string }>
   issues: { name: 'Issues agent', color: '#ef476f' },
   pulls: { name: 'PR agent', color: '#118ab2' },
   queue: { name: 'Queue agent', color: '#06d6a0' },
+  restroom: { name: 'Hajzel baba', color: '#b5838d' },
 };
 
 /** The upstairs office: a glass-walled loft on posts in the south-east corner, looking down on the desks. */
@@ -202,24 +205,21 @@ export const MEETING_BOARD = { x: MEETING_TABLE.x, y: 1.95, z: FLOOR.maxZ - 0.08
  */
 export const MEETING_SCREEN = { x: FLOOR.maxX, y: 1.73, z: MEETING_TABLE.z, width: 3.33, height: 1.665, bezel: 0.08 } as const;
 
-/** Any place a worker can be by id: the seats (the back office's included), the board agents' kiosks and the meeting room's chairs. */
+/** Any place a worker can be by id: the seats, the stations (see STATIONS) and the meeting room's chairs. */
 export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
 
-/**
- * The seat a new worker takes when nobody picks one: the first free desk (in the back office too, as
- * far as the floor is built out: `wing` rows), else the first free bean bag.
- */
-export function nextFreeSeat(taken: (id: string) => boolean, wing = 0): DeskDef | undefined {
-  return SEATS.find((d) => !taken(d.id) && deskBuilt(d, wing));
+/** The seat a new worker takes when nobody picks one: the first free desk, else the first free bean bag. */
+export function nextFreeSeat(taken: (id: string) => boolean): DeskDef | undefined {
+  return SEATS.find((d) => !taken(d.id));
 }
 
 /**
- * The bean bags that are out: every one in use, and while every desk is taken (the back office's
- * too, built out `wing` rows), the next free one too, so there's always somewhere to hire the next worker.
+ * The bean bags that are out: every one in use, and while every desk is taken, the next free one
+ * too, so there's always somewhere to hire the next worker.
  */
-export function beanbagsOut(taken: (id: string) => boolean, wing = 0): Set<string> {
+export function beanbagsOut(taken: (id: string) => boolean): Set<string> {
   const out = new Set(BEANBAGS.filter((b) => taken(b.id)).map((b) => b.id));
-  if (builtDesks(wing).every((d) => taken(d.id))) {
+  if (DESKS.every((d) => taken(d.id))) {
     const spare = BEANBAGS.find((b) => !taken(b.id));
     if (spare) out.add(spare.id);
   }
@@ -457,6 +457,8 @@ export interface SeatDef {
   roof?: boolean;
   /** At the bar: E there, sitting down, orders a drink. */
   bar?: boolean;
+  /** The restroom's toilet: whoever sits there talks to the hajzel baba (see RESTROOM). */
+  restroom?: boolean;
 }
 
 /**
@@ -484,6 +486,8 @@ export const SEATING: SeatDef[] = [
   { id: 'roof-sofa-3', label: '🛋️ Sofa', x: FIRE_PIT.x + 2.9, y: 0, z: FIRE_PIT.z + 0.4, rotY: -Math.PI / 2, places: [-0.6, 0.6], hips: 0.5, depth: -0.05, out: 0.8, roof: true },
   // …and sun loungers facing out over the city.
   ...LOUNGERS.map((x, i) => ({ id: `roof-lounger-${i + 1}`, label: '🏖️ Lounger', x, y: 0, z: FLOOR.maxZ - 1.5, rotY: 0, places: [0], hips: 0.42, depth: -0.2, out: -1, roof: true })),
+  // In the restroom's cubicle, facing its door.
+  { id: 'toilet', label: '🚽 Toilet', x: RESTROOM.toilet.x, y: 0, z: RESTROOM.toilet.z, rotY: 0, places: [0], hips: 0.42, depth: 0.05, out: 0.7, restroom: true },
 ];
 export const SEATING_BY_ID = new Map(SEATING.map((s) => [s.id, s]));
 

@@ -4,6 +4,7 @@ import { MAX_REPOS, type RepoSource } from '../../workers.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
 import { issueNumber, num, str } from '../../office/input.js';
+import { refusedInRestroom, restroomRefusal } from '../../restroom.js';
 import { here, workerOf } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
@@ -19,7 +20,7 @@ export const workerHandlers = {
   'worker.spawn'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
-    if (!floor) return;
+    if (!floor || refusedInRestroom(ctx, c, floor, str(msg.deskId, 32), 'prompt')) return;
     const kind = msg.kind === 'shell' ? 'shell' : 'agent';
     if (kind === 'agent' && msg.provider !== undefined && (!isAgentProvider(msg.provider) || !floor.project.agentProviders.includes(msg.provider))) {
       ctx.warn(c, 'Unknown agent provider');
@@ -54,7 +55,7 @@ export const workerHandlers = {
   'worker.kill'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
-    if (!w) return;
+    if (!w || refusedInRestroom(ctx, c, w.floor, w.info.deskId, 'kill')) return;
     const { floor, info } = w;
     // The worker leaves right away; its worktree is dealt with after that, and the outcome follows.
     const done = floor.sendHome(info.id, CLEANUPS.has(String(msg.cleanup)) ? msg.cleanup : undefined);
@@ -101,6 +102,7 @@ export const workerHandlers = {
   'worker.attach'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if (w && refusedInRestroom(ctx, c, w.floor, w.info.deskId, 'terminal')) return;
     const snap = w?.floor.workers.attach(w.wid, c.id, who);
     if (w && snap) {
       c.attached.add(w.wid);
@@ -116,6 +118,7 @@ export const workerHandlers = {
   'worker.prompt'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if (w && refusedInRestroom(ctx, c, w.floor, w.info.deskId, 'prompt')) return;
     const err = w ? w.floor.workers.prompt(w.wid, str(msg.prompt, 20000), who) : 'No such worker';
     ctx.warn(c, err);
     const issue = w?.info.kind === 'agent' ? issueNumber(msg.issue) : undefined;
@@ -129,6 +132,7 @@ export const workerHandlers = {
     const floor = here(ctx, c);
     if (!floor) return;
     const deskId = str(msg.deskId, 32);
+    if (refusedInRestroom(ctx, c, floor, deskId, 'prompt')) return;
     // Nobody there yet: whoever asks first hires it, on their own sign-ins.
     const hires = !floor.workers.deskOccupied(deskId);
     ctx.withSignIn(c, hires ? ctx.claudeFor(floor.workers.officeDefault.provider) : undefined, () => {
@@ -167,7 +171,9 @@ export const workerHandlers = {
   },
   'term.input'(ctx, c, msg) {
     const who = c.peer.name;
-    if (c.attached.has(msg.workerId)) ctx.workerFloor(msg.workerId)?.workers.write(msg.workerId, str(msg.data, 64 * 1024), who);
+    const w = c.attached.has(msg.workerId) ? workerOf(ctx, msg.workerId) : undefined;
+    // Typing to the hajzel baba takes sitting on the toilet still, not just having attached there. It's dropped quietly, keystroke by keystroke.
+    if (w && !restroomRefusal(c.peer, w.floor, w.info.deskId, 'terminal')) w.floor.workers.write(w.wid, str(msg.data, 64 * 1024), who);
   },
   'term.typing'(ctx, c, msg) {
     // Everyone else in that terminal sees who's typing. A typist says so about once a second.

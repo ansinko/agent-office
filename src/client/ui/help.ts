@@ -27,7 +27,6 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['R', 'Resume a sleeping worker'],
   ['X', 'Send a worker home (frees the desk)'],
   ['L', 'Hang a big sign over the desk you face ("Operations", "Code cleanup"), or change or take down the one there'],
-  ['🚧', 'Room to grow: E at the sign on the north wall past the gong knocks through into a back office with 2 more desks, and again for 2 more. The same sign walls a row back up'],
   ['F', 'Hang a picture on a wall: a link from the web, or your own (upload it, drop it or paste a screenshot). Look at a picture and press E to move, edit or take it down'],
   ['Q', 'Put back the issue card in your hands (E at a note on the issues board, or ✋ Pick it up in an issue; then E at an empty desk, a worker or the queue board), or drop the basketball'],
   ['🐶', 'Walk up to the office dog and press E to pet it. When a worker needs input, it runs to that desk and barks. Name it in ⚙️ Settings'],

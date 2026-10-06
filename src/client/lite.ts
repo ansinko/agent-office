@@ -263,8 +263,7 @@ function hire(deskId: string, prompt: string, worktree: boolean, provider?: Agen
 /** With `issue`, the worker the prompt goes to takes that GitHub issue. */
 function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number) {
   if (!store.project) return toast('Pick a floor first', 'warn');
-  // The back office's desks too, as far as the floor's built out (see WING).
-  const desk = nextFreeSeat((id) => !!store.workerAtDesk(id), store.floorPlan.wing)?.id;
+  const desk = nextFreeSeat((id) => !!store.workerAtDesk(id))?.id;
   const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));
   if (!desk && !awake.length) return toast('Every desk and bean bag is taken — send a worker home first', 'warn');
   openAsk({

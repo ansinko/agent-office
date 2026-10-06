@@ -1,7 +1,7 @@
-// A floor's own layout on top of the office everyone shares: the signs hung over its desks, and how
-// far its back office is built out (see WING in layout.ts). Saved by server/floorplan.ts.
+// A floor's own layout on top of the office everyone shares: the signs hung over its desks. Saved by
+// server/floorplan.ts.
 
-import { DESKS, WING, WING_DESKS, wingLevel } from './layout.js';
+import { DESKS } from './layout.js';
 
 /** A sign hanging from the ceiling over a desk, naming what it's for ("Operations", "Code cleanup"). */
 export interface DeskLabel {
@@ -13,13 +13,11 @@ export interface DeskLabel {
 }
 
 export interface FloorPlan {
-  /** How many rows the back office is built out (0 is just the room), up to WING.rows. */
-  wing: number;
   /** Signs by desk id. */
   labels: Record<string, DeskLabel>;
 }
 
-export const EMPTY_PLAN: FloorPlan = { wing: 0, labels: {} };
+export const EMPTY_PLAN: FloorPlan = { labels: {} };
 
 /** The longest a sign's text may be, in characters. */
 export const MAX_LABEL = 32;
@@ -38,8 +36,8 @@ export const SIGN_COLORS = [
 /** A few to start from, in the label window. */
 export const LABEL_IDEAS = ['Operations', 'Code cleanup', 'Frontend', 'Backend', 'Bug fixes', 'Docs', 'Infra', 'Research'];
 
-/** Desks that can have a sign: the room's and the back office's, not the bean bags, kiosks or meeting chairs. */
-const LABELABLE = new Set([...DESKS, ...WING_DESKS].map((d) => d.id));
+/** Desks that can have a sign: the room's, not the bean bags, kiosks or meeting chairs. */
+const LABELABLE = new Set(DESKS.map((d) => d.id));
 
 export function canLabel(deskId: string): boolean {
   return LABELABLE.has(deskId);
@@ -62,7 +60,7 @@ export function signInk(color: string): string {
   return SIGN_COLORS.find((c) => c.color === color)?.ink ?? SIGN_COLORS[0].ink;
 }
 
-/** A plan read back from disk (or anywhere else it can't be trusted): what's valid of it. */
+/** A plan read back from disk (or anywhere else it can't be trusted): what's valid of it, its signs. */
 export function cleanPlan(raw: unknown): FloorPlan {
   const r = raw && typeof raw === 'object' ? (raw as Partial<Record<keyof FloorPlan, unknown>>) : {};
   const labels: Record<string, DeskLabel> = {};
@@ -75,15 +73,5 @@ export function cleanPlan(raw: unknown): FloorPlan {
       labels[id] = { text, color: signColor(s.color), by: typeof s.by === 'string' ? s.by : '?', at: typeof s.at === 'number' ? s.at : 0 };
     }
   }
-  return { wing: wingLevel(r.wing), labels };
-}
-
-/** The desks a row of the back office brings: `row` from 1. */
-export function rowDesks(row: number) {
-  return WING_DESKS.filter((d) => d.wing === row);
-}
-
-/** How many more rows the back office can take. */
-export function roomToGrow(plan: FloorPlan): number {
-  return WING.rows - plan.wing;
+  return { labels };
 }

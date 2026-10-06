@@ -1,19 +1,17 @@
 /**
  * The workers as you see them: at their desks with their laptops (or up and about in the castle),
  * walking in to a meeting, packing up when they're sent home (or marched down to the dungeon), how
- * worn out they look, and the seats: which are free, the bean bags, the back office built out. Also
+ * worn out they look, and the seats: which are free, the bean bags, the back office. Also
  * the building dressed up for a holiday, and what the workers have spent.
  */
 import * as THREE from 'three';
-import { FLOOR, WING, beanbagsOut, deskBuilt, vacantSeats, wingMinZ, wingRowZ } from '../../../shared/layout';
-import { OFFICE_PLAN } from '../../../shared/maps';
+import { FLOOR, WING, beanbagsOut, vacantSeats, wingMinZ } from '../../../shared/layout';
 import { MEETING_PATTERNS } from '../../../shared/meetings';
 import type { WorkerInfo, WorkerTask } from '../../../shared/protocol';
 import { workerPr } from '../../../shared/status';
 import type { Ctx } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
-import { pastTheWing, seatBuilt } from '../../core/floors';
-import { aside, hintTitle, key, onE } from '../../core/hint';
+import { pastTheWing } from '../../core/floors';
 import { noOutline } from '../../core/outline';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder } from '../../nextup';
@@ -21,7 +19,6 @@ import { waitingOnSomeone } from '../../notify';
 import { renderTitle } from '../../shared/title';
 import { store } from '../../state';
 import { $ } from '../../ui/dom';
-import { openExpand } from '../../ui/floorplan';
 import { renderWorkers } from '../../ui/workers-panel';
 import { renderLimits } from '../../ui/limits';
 import { modelBadge, providerLabel } from '../../ui/provider';
@@ -32,13 +29,6 @@ import { Jail } from './jail';
 import { Laptop } from './laptop';
 import { Arrivals, Departures } from './leaving';
 import { Sendoffs } from './sendhome';
-
-// The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
-declare module '../../world/types' {
-  interface InteractKinds {
-    expand: true;
-  }
-}
 
 export interface WorkerView {
   model: Worker;
@@ -278,8 +268,8 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
     const world = ctx.world();
     // Someone sent home still counts until they get up, so a bean bag stays out under them.
     const free = vacantSeats(store.workers.values(), (id) => departures.seated(id) || sendoffs.seated(id));
-    for (const [id, desk] of world.desks) desk.vacancy.visible = free.has(id) && seatBuilt(id);
-    const appeared = world.setBeanbags(beanbagsOut((id) => !free.has(id), store.floorPlan.wing));
+    for (const [id, desk] of world.desks) desk.vacancy.visible = free.has(id);
+    const appeared = world.setBeanbags(beanbagsOut((id) => !free.has(id)));
     // One came out right where you're standing (on the office floor, not down in the garage): you end up on top of it.
     const p = player.pos;
     for (const c of appeared) if (p.y > -0.1 && p.y < c.top && p.x > c.minX - 0.3 && p.x < c.maxX + 0.3 && p.z > c.minZ - 0.3 && p.z < c.maxZ + 0.3) p.y = c.top;
@@ -317,47 +307,28 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
     parts.worlds.court()?.update(dt);
   });
 
-  /** The floor plan last shown, to tell someone knocking through from arriving on a floor already built out (or back on the office's map). */
-  let shownPlan: { floor: string | null; map: string; wing: number } = { floor: null, map: OFFICE_PLAN.id, wing: 0 };
   /**
-   * The floor's back office, as far as it's built out, and the signs over its desks. Everything that
-   * finds its way round the floor learns how far it goes; a row knocked through goes up in a puff of
-   * dust, and anyone standing past where it goes now steps back in first.
+   * The floor's back office, the restroom, where there is one (not on the roof or a map of its own),
+   * and the signs over its desks. Everything that finds its way round the floor learns how far it
+   * goes, and anyone standing past where it goes steps back in first.
    */
   function syncPlan() {
-    const fp = store.floorPlan;
     const level = officeWing();
-    const was = shownPlan;
-    shownPlan = { floor: store.floor, map: plan().id, wing: level };
     const p = player.pos;
     if (inOffice() && pastTheWing(p, level)) {
-      // Out to the side aisle of what's left, or back into the room.
+      // Out to the side aisle of what's there, or back into the room.
       const side = p.x < (WING.minX + WING.maxX) / 2 ? WING.minX + 0.6 : WING.maxX - 0.6;
       p.set(level ? side : p.x, 0, level ? wingMinZ(level) + 0.6 : FLOOR.minZ + 1.6);
     }
     office.setWing(level);
-    office.signs.set(fp.labels, (d) => deskBuilt(d, level));
+    office.signs.set(store.floorPlan.labels);
     player.wing = sound.wing = level;
     sky.setWing(level);
     parts.travel.syncStack();
     parts.rooftop.syncRoof();
     arrangeSeats();
-    if (was.floor === store.floor && was.map === shownPlan.map && level > was.wing) {
-      const at = { x: (WING.minX + WING.maxX) / 2, y: 1.2, z: wingRowZ(level) };
-      confetti.burst(at.x, 2.4, at.z, 140, 0.8);
-      sound.toss('thunk', at);
-    }
   }
   store.on('floorPlan', syncPlan);
-  ctx.interactions.define('expand', {
-    reach: 8,
-    hint: () => {
-      const level = store.floorPlan.wing;
-      if (level >= WING.rows) return { k: 'full', parts: [hintTitle('🏢 Back office'), aside('built all the way out'), key('E', 'Wall a row up')] };
-      return { k: String(level), parts: [hintTitle(level ? '🚧 Room to grow' : '🚧 Room to grow through the wall'), aside(level ? `${level} of ${WING.rows} rows built` : 'the office can get bigger here'), key('E', level ? 'Another row: 2 more desks' : 'Knock through: 2 more desks')] };
-    },
-    use: onE(() => openExpand(net)),
-  });
   // A worker at the meeting table shows its role and round over its head (see meetingCard).
   store.on('meeting', syncWorkers);
   // A worker's bubble shows whether it has a pull request open (green) or merged (purple: send it home).

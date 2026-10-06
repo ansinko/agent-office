@@ -25,6 +25,14 @@ export const appScreenHandlers = {
     if (err) return ctx.warn(c, err);
     ctx.toastAll(`🖥️ ${c.peer.name} changed the meeting room screen’s pages`);
   },
+  'appScreen.pin'(ctx, c, msg) {
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can change the screen’s pages');
+    if (!throttle(c, 'appScreen.pin', 500)) return;
+    const up = ctx.appScreen.config.current?.id;
+    const err = ctx.appScreen.pin(str(msg.from, 32), str(msg.path, 2048), c.peer.name);
+    if (err) return ctx.warn(c, err);
+    if (ctx.appScreen.config.current?.id !== up) ctx.toastAll(`🖥️ ${c.peer.name} put ${ctx.appScreen.config.current?.name} up on the meeting room screen`);
+  },
   'appScreen.login'(ctx, c, msg) {
     if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can change how the screen signs in');
     const id = str(msg.id, 32);

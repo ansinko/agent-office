@@ -91,6 +91,34 @@ test('the pages and their sign-ins are saved for the office alone; a changed add
   assert.equal(new AppScreenConfig(dir).rotate, 60);
 });
 
+test("the window's page goes up as a page of its own on the same site, with its sign-in, saved once", (t) => {
+  const dir = tempDir(t);
+  const cfg = new AppScreenConfig(dir);
+  assert.equal(cfg.setPages([{ name: 'Admin', url: 'http://localhost:3010/' }, { name: 'Lunch', url: 'https://lunch.example.com/' }], 'ana'), undefined);
+  const [admin, lunch] = cfg.pages;
+  assert.equal(cfg.setLogin(admin.id, { user: 'ana', password: 'hunter2' }), undefined);
+
+  assert.equal(cfg.pin(admin.id, '/review?tab=new', 'ana'), undefined);
+  const review = cfg.current!;
+  assert.deepEqual([review.name, review.url, review.login], ['Admin /review?tab=new', 'http://localhost:3010/review?tab=new', { user: 'ana', password: 'hunter2' }]);
+  assert.equal(cfg.shown.by, 'ana');
+  assert.equal(new AppScreenConfig(dir).page(review.id)?.login?.password, 'hunter2', 'saved with its sign-in');
+
+  // The same page again is the one already saved, and one pinned from it is named after the site.
+  assert.equal(cfg.pin(admin.id, '/review?tab=new', 'bob'), undefined);
+  assert.equal(cfg.pages.length, 3);
+  assert.equal(cfg.current?.id, review.id);
+  assert.equal(cfg.pin(review.id, '/leads/5', 'ana'), undefined);
+  assert.equal(cfg.current?.name, 'Admin /leads/5');
+  assert.equal(cfg.pin(lunch.id, '/today', 'ana'), undefined);
+  assert.equal(cfg.current?.login, undefined);
+
+  for (const bad of ['//evil.example/', '/\\evil.example/', 'https://evil.example/', 'review', 7]) assert.equal(cfg.pin(admin.id, bad, 'ana'), 'That isn’t a page on the same site', String(bad));
+  assert.equal(cfg.pin('nope', '/x', 'ana'), 'That page isn’t on the screen’s list any more');
+  for (let i = cfg.pages.length; i < 24; i++) assert.equal(cfg.pin(admin.id, `/p${i}`, 'ana'), undefined);
+  assert.equal(cfg.pin(admin.id, '/one-more', 'ana'), 'The screen keeps 24 pages at most');
+});
+
 test("a page's window: through the office on its own network, framed over https unless it won't be, else its snapshot", () => {
   for (const h of ['localhost', '127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.1.5', '100.102.179.53', 'build-box', 'nas.local', '[::1]', 'office.tail1234.ts.net']) assert.ok(isLocalHost(h), h);
   for (const h of ['example.com', '8.8.8.8', '172.32.0.1', '100.128.0.1', 'menu-picker-three.vercel.app']) assert.ok(!isLocalHost(h), h);

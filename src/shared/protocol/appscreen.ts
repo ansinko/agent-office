@@ -61,6 +61,11 @@ export type AppScreenClientMsg =
   | { t: 'appScreen.show'; id: string }
   /** The saved pages, all of them, in order (admins only): one left out is deleted. */
   | { t: 'appScreen.pages'; pages: ScreenPageInput[] }
+  /**
+   * Put up the page at `path` on saved page `from`'s site, as the screen's window shows it (admins
+   * only): saved first, with `from`'s sign-in, when it isn't one of the pages yet.
+   */
+  | { t: 'appScreen.pin'; from: string; path: string }
   /** How a page's snapshots sign in (admins only); null forgets it. */
   | { t: 'appScreen.login'; id: string; login: AppScreenLogin | null }
   /** Let the pages take turns, `every` seconds each (one of ROTATE_CHOICES); 0 stops it. */

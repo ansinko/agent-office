@@ -30,21 +30,34 @@ export function openAppScreen(net: Net) {
   const newTab = h('a.btn.as-newtab', { target: '_blank', rel: 'noopener noreferrer' }, '↗ New tab') as HTMLAnchorElement;
   const snap = h('button.btn', { type: 'button', title: 'Snapshot it again now, for the screen', onclick: () => net.send({ t: 'appScreen.refresh' }) }, '📸');
   const manageBtn = h('button.btn', { type: 'button', title: 'The pages the screen can show (admins)', onclick: () => toggleManage() }, '⚙️ Pages');
+  const pinBtn = h('button.btn', { type: 'button', title: 'Put the page this window is on up on the screen, for everyone, and save it with the pages', onclick: () => at && net.send({ t: 'appScreen.pin', from: at.page, path: at.path }) }, '📌 Put this up');
   const title = h('h2', {}, '🖥️ Meeting room screen');
   const view = h('div.as-view');
   const foot = h('div.as-foot');
   const manage = h('div.as-manage');
   manage.hidden = true;
-  const el = h('div.modal.appscreen', {}, h('header', {}, title, snap, newTab, manageBtn), h('div.as-bar', {}, tabs, rotate), view, manage, foot);
+  const el = h('div.modal.appscreen', {}, h('header', {}, title, pinBtn, snap, newTab, manageBtn), h('div.as-bar', {}, tabs, rotate), view, manage, foot);
 
   /** What the frame was last pointed at, so a new snapshot doesn't reload the page someone is using. */
   let shown = '';
   let frame: HTMLIFrameElement | undefined;
+  /** The page the frame was opened on, and where in its app it is now, as its frame script says. */
+  let at: { page: string; path: string } | undefined;
+  const pathOf = (url: string) => {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}`;
+  };
+  /** 📌 shows while an admin's window is on another page of the app than the one up. */
+  const paintPin = () => {
+    const up = store.appScreen.pages.find((p) => p.id === store.appScreen.current);
+    pinBtn.hidden = !store.me.admin || !frame || !at || !up || (up.id === at.page && pathOf(up.url) === at.path);
+  };
 
   const render = () => {
     const state = store.appScreen;
     const page = state.pages.find((p) => p.id === state.current);
     manageBtn.hidden = !store.me.admin;
+    paintPin();
     rotate.value = String(state.rotate);
     rotate.disabled = state.pages.length < 2;
     tabs.replaceChildren(
@@ -56,6 +69,7 @@ export function openAppScreen(net: Net) {
     if (!page) {
       shown = '';
       frame = undefined;
+      paintPin();
       view.replaceChildren();
       newTab.hidden = true;
       foot.textContent = '';
@@ -71,12 +85,15 @@ export function openAppScreen(net: Net) {
       foot.textContent = `${by}${page.view === 'proxy' ? 'Shown through the office. Blank? Open it in a new tab once to let your browser trust the office there.' : 'Esc inside the page? Click outside it first, or ✕.'}`;
       if (shown === address) return;
       shown = address;
-      frame = h('iframe.as-frame', { src: address, title: page.name, allow: 'clipboard-read; clipboard-write; fullscreen', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals' }) as HTMLIFrameElement;
+      at = undefined;
+      frame = h('iframe.as-frame', { 'data-page': page.id, src: address, title: page.name, allow: 'clipboard-read; clipboard-write; fullscreen', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals' }) as HTMLIFrameElement;
       view.replaceChildren(frame);
+      paintPin();
       return;
     }
     // A page shown as its snapshot: why, and the way to it.
     frame = undefined;
+    paintPin();
     const why = page.view === 'proxy' ? (state.proxyError ?? 'The office isn’t serving its apps right now.') : page.why;
     foot.textContent = `${by}${snapped}`;
     const key = `shot ${page.id} ${page.shotAt} ${page.error} ${why}`;
@@ -178,9 +195,16 @@ export function openAppScreen(net: Net) {
     cookie.focus();
   };
 
-  // Esc pressed inside an app that comes through the office closes the window too (see its frame script).
+  // From the frame script of an app that comes through the office: Esc pressed inside it closes the
+  // window too, and where in the app the window is now.
   const onMessage = (e: MessageEvent) => {
-    if (frame && e.source === frame.contentWindow && (e.data as { agentOffice?: string } | null)?.agentOffice === 'escape') modal.close();
+    if (!frame || e.source !== frame.contentWindow) return;
+    const data = e.data as { agentOffice?: string; path?: unknown } | null;
+    if (data?.agentOffice === 'escape') modal.close();
+    if (data?.agentOffice === 'at' && typeof data.path === 'string' && data.path.startsWith('/')) {
+      at = { page: frame.dataset.page ?? '', path: data.path };
+      paintPin();
+    }
   };
   window.addEventListener('message', onMessage);
   const off = store.on('appScreen', () => {

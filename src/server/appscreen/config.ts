@@ -136,6 +136,34 @@ export class AppScreenConfig {
     this.show(page.id, by);
   }
 
+  /**
+   * Puts up the page at `path` on saved page `from`'s site, saving it first when it isn't one, named
+   * after the site's first saved page and signed in the way `from` is. A string says why it can't.
+   */
+  pin(from: string, path: unknown, by: string): string | undefined {
+    const source = this.page(from);
+    if (!source) return 'That page isn’t on the screen’s list any more';
+    const origin = new URL(source.url).origin;
+    let target: URL;
+    try {
+      target = new URL(typeof path === 'string' && path.startsWith('/') ? path : '//', source.url);
+    } catch {
+      return 'That isn’t a page on the same site';
+    }
+    if (target.origin !== origin) return 'That isn’t a page on the same site';
+    const url = checkScreenUrl(target.href);
+    if ('error' in url) return url.error;
+    let page = this.saved.pages.find((p) => p.url === url.url);
+    if (!page) {
+      if (this.saved.pages.length >= MAX_PAGES) return `The screen keeps ${MAX_PAGES} pages at most`;
+      const site = this.saved.pages.find((p) => new URL(p.url).origin === origin) ?? source;
+      const where = new URL(url.url);
+      page = { id: newId(), name: `${site.name} ${where.pathname}${where.search}`.slice(0, PAGE_NAME_MAX), url: url.url, ...(source.login ? { login: { ...source.login } } : {}) };
+      this.saved.pages.push(page);
+    }
+    this.show(page.id, by);
+  }
+
   /** Replaces the saved pages; the one up stays up if it's still there, else the first goes up. */
   setPages(raw: unknown, by: string): string | undefined {
     const pages = checkPages(raw, this.saved.pages);

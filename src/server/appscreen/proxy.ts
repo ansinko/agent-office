@@ -20,8 +20,13 @@ const FRAME_SCRIPT = `${PROXY_OWN}frame.js`;
 /** Where a window opens page ?page=<id>: it's remembered in PAGE_COOKIE, then the page's own address. */
 export const PROXY_OPEN = `${PROXY_OWN}open`;
 const PAGE_COOKIE = 'ao_screen_page';
-/** Lets the office close its window on Esc pressed inside the app, which the app's frame would keep to itself. */
-const FRAME_JS = `addEventListener('keydown',function(e){if(e.key==='Escape'&&!e.defaultPrevented)parent.postMessage({agentOffice:'escape'},'*')});\n`;
+/**
+ * Lets the office close its window on Esc pressed inside the app, which the app's frame would keep to
+ * itself, and tells it which of the app's pages the window is on (checked every second, since an app
+ * that routes in the browser changes it without loading a page), for 📌 to put that one up.
+ */
+const FRAME_JS = `addEventListener('keydown',function(e){if(e.key==='Escape'&&!e.defaultPrevented)parent.postMessage({agentOffice:'escape'},'*')});
+(function(){var last='';function at(){var p=location.pathname+location.search;if(p!==last){last=p;parent.postMessage({agentOffice:'at',path:p},'*')}}at();setInterval(at,1000)})();\n`;
 /** Pages bigger than this go through as they are, without the frame script. */
 const MAX_INJECT_BYTES = 4 * 1024 * 1024;
 

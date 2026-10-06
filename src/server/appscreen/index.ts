@@ -137,6 +137,15 @@ export class AppScreen {
     this.put(id, by);
   }
 
+  /** Puts up the page at `path` on page `from`'s site, saving it first if need be (see AppScreenConfig.pin). */
+  pin(from: string, path: unknown, by: string): string | undefined {
+    const up = this.config.current?.id;
+    const err = this.config.pin(from, path, by);
+    if (err) return err;
+    if (this.config.current?.id !== up) this.moved();
+    this.changed();
+  }
+
   /** Replaces the saved pages; a string says why they won't do. */
   setPages(raw: unknown, by: string): string | undefined {
     const before = new Map(this.config.pages.map((p) => [p.id, p.url]));

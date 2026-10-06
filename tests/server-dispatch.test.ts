@@ -138,6 +138,9 @@ before(async () => {
   for (const args of [['init', '-q', '-b', 'main'], ['add', '.'], ['-c', 'user.name=test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'init']]) {
     execFileSync('git', args, { cwd: project });
   }
+  // The meeting room screen with no pages: nothing is snapshotted, or served, while the tests run.
+  mkdirSync(path.join(project, '.agent-office'), { recursive: true });
+  writeFileSync(path.join(project, '.agent-office', 'app-screen.json'), JSON.stringify({ pages: [], rotate: 0 }));
   // A client bundle of its own, so the test needn't build one.
   for (const page of ['index', 'login', 'claim', 'join', 'lite']) writeFileSync(path.join(publicDir, `${page}.html`), `<!doctype html><title>${page}</title>`);
   writeFileSync(path.join(publicDir, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
@@ -148,8 +151,6 @@ before(async () => {
   chmodSync(claude, 0o755);
 
   for (const k of Object.keys(process.env)) if (k.startsWith('AGENT_OFFICE_')) delete process.env[k];
-  // No headless browser for the meeting room screen's snapshots: one that isn't there fails at once.
-  process.env.AGENT_OFFICE_CHROMIUM = path.join(bin, 'no-chromium');
   const port = await freePort();
   const cfg = loadConfig([project, '--home', home, '--projects', path.join(tmp, 'projects'), '--port', String(port), '--password', PASSWORD, '--no-open', '--weather', 'clear', '--agent', claude]);
   office = await startServer(cfg, { publicDir });

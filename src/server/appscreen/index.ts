@@ -50,6 +50,8 @@ export class AppScreen {
   private listening = false;
   private proxyError?: string;
   private timer?: NodeJS.Timeout;
+  /** What everyone was last told (see tell). */
+  private said = '';
   private readonly now: () => number;
 
   constructor(private readonly opts: AppScreenOptions) {
@@ -187,7 +189,16 @@ export class AppScreen {
 
   private changed() {
     this.serve();
-    this.opts.changed(this.state());
+    this.tell();
+  }
+
+  /** Tells everyone what's on the screen, when that's changed since they last heard. */
+  private tell() {
+    const state = this.state();
+    const said = JSON.stringify(state);
+    if (said === this.said) return;
+    this.said = said;
+    this.opts.changed(state);
   }
 
   private done(result: ShotResult, at: number) {
@@ -195,7 +206,7 @@ export class AppScreen {
     if (!id) return;
     const was = this.shots.get(id);
     this.shots.set(id, 'body' in result ? { body: result.body, at, blocked: result.blocked } : { ...was, error: result.error });
-    this.opts.changed(this.state());
+    this.tell();
   }
 
   /** The address of saved page `id`, when the office serves its window. */
@@ -223,12 +234,12 @@ export class AppScreen {
       this.proxyError = err.code === 'EADDRINUSE' ? `Port ${port} is taken: start the office with --meeting-screen-port <another>` : `The office can't serve the screen's apps on port ${port}: ${err.message}`;
       console.error(`agent-office: meeting room screen: ${this.proxyError}`);
       if (this.server === server) this.server = undefined;
-      this.opts.changed(this.state());
+      this.tell();
     });
     server.listen(port, host, () => {
       this.listening = true;
       this.proxyError = undefined;
-      this.opts.changed(this.state());
+      this.tell();
     });
     server.unref();
     this.server = server;

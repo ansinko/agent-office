@@ -417,3 +417,26 @@ test('a downloaded Chromium of any build is found, newest first and the headless
     [],
   );
 });
+
+test('a snapshot that fails the same way again tells nobody anything new', async (t) => {
+  let now = 9_000_000;
+  const states: AppScreenState[] = [];
+  const screen = new AppScreen({
+    dataDir: tempDir(t),
+    host: '127.0.0.1',
+    port: 0,
+    signedIn: () => true,
+    active: () => true,
+    changed: (s) => void states.push(s),
+    capture: async () => ({ error: 'Nothing is answering at 127.0.0.1:3000' }),
+    now: () => now,
+  });
+  for (let i = 0; i < 3; i++) {
+    screen.tick();
+    await new Promise((resolve) => setImmediate(resolve));
+    now += 20_000;
+  }
+  assert.equal(states.length, 1);
+  assert.equal(states[0].pages[0].error, 'Nothing is answering at 127.0.0.1:3000');
+  screen.stop();
+});

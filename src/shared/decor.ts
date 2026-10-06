@@ -1,13 +1,15 @@
 // Pictures people hang on the office walls. The server keeps the list; every browser draws them
-// in frames, loading each image through the office (GET /api/image), so any image host works.
+// in frames, loading each image through the office (GET /api/image), so any image host works, or
+// straight from the office when it's a picture someone uploaded (see wall.ts).
 
 import { FLOOR, LOFT, WALL_HEIGHT } from './layout.js';
+import { isWallUrl } from './wall.js';
 
 export type WallId = 'north' | 'south' | 'east' | 'west';
 
 /** Where a picture hangs, what it shows and how it's framed: what a client sends. */
 export interface DecorPlacement {
-  /** The image, somewhere online (http or https). */
+  /** The image, somewhere online (http or https), or uploaded to the office (/api/wall/…). */
   url: string;
   title?: string;
   wall: WallId;
@@ -184,6 +186,7 @@ export function checkImageUrl(raw: unknown): { url: string } | { error: string }
   const s = typeof raw === 'string' ? raw.trim() : '';
   if (!s) return { error: 'Paste a link to an image' };
   if (s.length > 2048) return { error: 'That link is too long' };
+  if (isWallUrl(s)) return { url: s };
   let u: URL;
   try {
     u = new URL(s);

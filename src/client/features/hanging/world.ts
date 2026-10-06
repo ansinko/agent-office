@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FRAMES, FRAME_BORDER, WALLS, frameRect, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
 import { FLOOR, LOFT } from '../../../shared/layout';
+import { isWallUrl } from '../../../shared/wall';
 import type { Interactable } from '../../world/types';
 import { toon } from '../../world/toon';
 
@@ -20,9 +21,12 @@ const MAX_TEXTURE = 1024;
 const pictures = new Map<string, Promise<Picture>>();
 const holds = new Map<string, number>();
 
-/** The office fetches images for us, so a picture shows up whatever its host allows. */
+/**
+ * The office fetches images for us, so a picture shows up whatever its host allows. One uploaded
+ * to the office is there already.
+ */
 export function imageUrl(url: string): string {
-  return `/api/image?url=${encodeURIComponent(url)}`;
+  return isWallUrl(url) ? url : `/api/image?url=${encodeURIComponent(url)}`;
 }
 
 async function fetchPicture(url: string): Promise<Picture> {

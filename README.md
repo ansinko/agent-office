@@ -373,6 +373,7 @@ deploy/coolify.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 | N | Go to the next worker that's waiting on you |
 | X | Send a worker home |
 | L | Hang a sign over a desk ("Operations", "Code cleanup") |
+| F | Hang a picture on a wall: paste a link, or upload your own (pick a file, drop it on the dialog, or paste a screenshot with Ctrl+V) |
 | T / Enter | Chat |
 | V | Join voice; then hold V to talk |
 | M | Mute / unmute in voice |

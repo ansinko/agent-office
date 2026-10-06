@@ -4,7 +4,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -469,6 +469,45 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   assert.deepEqual([...a.pending('toast'), ...a.pending('gh.merged'), ...a.pending('gh.closed')], []);
   a.send({ t: 'machine.limit', limit: null });
   await a.take('machine', (m) => m.state.limit === undefined);
+  await a.close();
+});
+
+test('a picture uploaded for the wall is served from the office, and deleted once it comes down', async () => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const upload = (body: BodyInit, headers: Record<string, string>) => fetch(base + '/api/wall', { method: 'POST', body, headers: { 'content-type': 'image/png', ...headers } });
+  assert.equal((await upload(png, {})).status, 401);
+  assert.equal((await upload(png, { cookie })).status, 403);
+  assert.equal((await upload(png, { cookie, origin: 'http://evil.example' })).status, 403);
+  const me = { cookie, origin: base };
+  const notPicture = await upload('<html></html>', me);
+  assert.equal(notPicture.status, 415);
+  const ok = await upload(png, me);
+  assert.equal(ok.status, 200);
+  const { url } = (await ok.json()) as { url: string };
+  assert.match(url, /^\/api\/wall\/[0-9a-f]{64}\.png$/);
+  const file = path.join(tmp, 'project', '.agent-office', 'wall', url.slice('/api/wall/'.length));
+  assert.ok(existsSync(file));
+
+  assert.equal((await get(url)).status, 401);
+  const served = await get(url, { cookie });
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get('content-type'), 'image/png');
+  assert.match(served.headers.get('content-security-policy') ?? '', /sandbox/);
+  assert.equal(served.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await served.arrayBuffer()), png);
+  assert.equal((await get(`/api/wall/${'0'.repeat(64)}.png`, { cookie })).status, 404);
+
+  // Hung, it stays; taken down with nothing else showing it, its file goes.
+  const a = await Browser.open('?name=Ed');
+  await a.take('welcome');
+  a.send({ t: 'decor.add', decor: { url, wall: 'north', u: 0, y: 1.5, w: 1, h: 1, frame: 0 } });
+  const hung = (await a.take('decor', (m) => m.items.some((d) => d.url === url))).items.find((d) => d.url === url)!;
+  assert.ok(existsSync(file));
+  a.send({ t: 'decor.remove', id: hung.id });
+  await a.take('decor', (m) => !m.items.some((d) => d.url === url));
+  assert.ok(!existsSync(file));
+  a.send({ t: 'decor.add', decor: { url, wall: 'north', u: 0, y: 1.5, w: 1, h: 1, frame: 0 } });
+  assert.equal((await a.take('toast', (m) => m.level === 'warn')).text, "That picture isn't on the office anymore. Upload it again.");
   await a.close();
 });
 

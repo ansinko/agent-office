@@ -12,6 +12,7 @@ import type { Team } from '../team.js';
 import type { Upgrader } from '../upgrade.js';
 import type { Services } from '../services.js';
 import type { ImageProxy } from '../decor.js';
+import type { WallStore } from '../wall.js';
 import type { Ledger } from '../usage.js';
 import type { PlanLimitsReader } from '../limits.js';
 import type { Webhook } from '../webhook.js';
@@ -87,6 +88,8 @@ export interface LateServices {
   tailnet: Tailnet;
   services: Services;
   images: ImageProxy;
+  /** Pictures uploaded to hang on the walls. */
+  wall: WallStore;
   upgrader: Upgrader;
   /** A floor's Services board: its own workers' servers. */
   servicesState(floor: Floor | undefined, items?: ServiceInfo[]): ServicesState;

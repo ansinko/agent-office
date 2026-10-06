@@ -1,6 +1,10 @@
 /* Pictures on the walls */
 .modal.hang { width: min(560px, 100%); }
 .hang .seg { gap: 6px; }
+.hang-source { display: flex; flex-wrap: wrap; gap: 8px; }
+.hang-source input { flex: 1 1 220px; min-width: 0; }
+.hang-source .btn { flex: none; white-space: nowrap; }
+.modal.hang.dropping { outline: 4px dashed #1d6fd6; outline-offset: -10px; }
 .hang .seg .btn { padding: 4px 10px; font-size: 13px; }
 .hang .seg .dot { width: 12px; height: 12px; }
 .hang-preview { display: flex; justify-content: center; margin-top: 14px; }

@@ -56,8 +56,8 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
     mat.needsUpdate = true;
   }
   /** Issues whose cards someone on this floor is carrying around, so they're missing from the board. */
-  function offBoard(): Set<number> {
-    const off = new Set<number>();
+  function offBoard(): Set<string> {
+    const off = new Set<string>();
     const carrying = ctx.carrying();
     if (carrying) off.add(carrying.issue);
     for (const p of store.peers.values()) if (p.carrying && p.id !== store.you && store.onMyFloor(p)) off.add(p.carrying.issue);
@@ -67,7 +67,7 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   // The cork holds the issues nobody has started on: one that's in progress comes off it, as a closed one does.
   const renderIssuesBoard = () => {
     const off = offBoard();
-    issuesTex.render({ ...store.issues, items: store.issues.items.filter((i) => !off.has(i.number) && !inProgress(i, store.taskForIssue(i.number))) });
+    issuesTex.render({ ...store.issues, items: store.issues.items.filter((i) => !off.has(i.key) && !inProgress(i, store.taskForIssue(i.key))) });
   };
   // The queue too: a task that starts running takes its issue off the board before GitHub says it's assigned.
   mountBoard(office.boardMeshes.issues, issuesTex.texture, renderIssuesBoard, ['issues', 'queue']);
@@ -104,7 +104,7 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
     reach: 9,
     hint: () => {
       const aimedNote = deps.aimedNote();
-      if (aimedNote) return { k: String(aimedNote.number), parts: [hintTitle(clip(`📌 #${aimedNote.number} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
+      if (aimedNote) return { k: aimedNote.key, parts: [hintTitle(clip(`📌 ${aimedNote.ref} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
       return issuesTex.hasNotes ? { k: 'notes', parts: [hintTitle('📌 Issues board'), key('E', 'Open'), aside('or point at a note to take it')] } : boardHint('📌 Issues board');
     },
     use: (_it, key, note) => {

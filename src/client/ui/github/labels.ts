@@ -3,7 +3,8 @@ import type { GhIssue, GhLabel, GhPull } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
 import { repoUrlOf } from '../markdown';
-import { getJson, labelWaiters } from './api';
+import { getJson, labelWaiters, refTo, waitKey } from './api';
+import { refText } from './notes';
 import { errorBox, spinnerRow } from './pieces';
 
 // ---- Labels -----------------------------------------------------------------------------------
@@ -20,7 +21,8 @@ export function labelChip(l: GhLabel) {
  * then save, and the office's gh account adds and takes off the difference.
  */
 export function openLabels(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Net, onSaved?: (labels: GhLabel[]) => void) {
-  const key = `${kind}:${it.number}`;
+  const ref = refTo(kind, it);
+  const key = waitKey(ref);
   const had = new Set(it.labels.map((l) => l.name));
   const on = new Set(had);
   const noun = kind === 'pull' ? 'PR' : 'issue';
@@ -41,8 +43,8 @@ export function openLabels(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Ne
   const save = h('button.btn.primary', { type: 'button' }, '🏷️ Save labels');
   const el = h(
     'div.modal.gh-merge.gh-labeler',
-    { role: 'dialog', 'aria-label': `Labels on ${noun} #${it.number}` },
-    h('header', {}, h('h2', {}, `🏷️ Labels on ${noun} #${it.number}`)),
+    { role: 'dialog', 'aria-label': `Labels on ${noun} ${refText(it)}` },
+    h('header', {}, h('h2', {}, `🏷️ Labels on ${noun} ${refText(it)}`)),
     h('div.body', {}, h('p.gh-merge-title', {}, it.title), filter, list, none, result),
     h('footer', {}, summary, cancel, save),
   );
@@ -130,7 +132,7 @@ export function openLabels(kind: 'issue' | 'pull', it: GhIssue | GhPull, net: Ne
       settle();
       fail('No answer from the office. Look at the board to see whether the labels changed before saving again.');
     }, 45_000);
-    net.send({ t: 'gh.labels', kind, number: it.number, add, remove });
+    net.send({ t: 'gh.labels', ...ref, add, remove });
   };
 
   filter.addEventListener('input', applyFilter);

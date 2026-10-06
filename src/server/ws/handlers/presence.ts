@@ -7,7 +7,7 @@ import { isEmote } from '../../../shared/emotes.js';
 import { ROOF, isDrink } from '../../../shared/rooftop.js';
 import { isBarGame } from '../../../shared/bargames.js';
 import { throttle } from '../../office/client.js';
-import { COLOR_RE, issueNumber, num, str } from '../../office/input.js';
+import { COLOR_RE, issueKey, num, str } from '../../office/input.js';
 import type { HandlerMap } from './types.js';
 
 export const presenceHandlers = {
@@ -80,7 +80,7 @@ export const presenceHandlers = {
   },
   carry(ctx, c, msg) {
     // Everyone on the floor sees the issue card in their hands, and whoever comes in later too.
-    const issue = issueNumber(msg.issue);
+    const issue = issueKey(msg.issue);
     if (issue === c.peer.carrying?.issue) return;
     if (issue !== undefined) c.peer.carrying = { issue, title: str(msg.title, 200) };
     else delete c.peer.carrying;

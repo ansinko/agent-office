@@ -77,7 +77,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return true;
   }
 
-  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: number, repos?: string[], via?: 'herald') {
+  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: string, repos?: string[], via?: 'herald') {
     net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined, via });
     // The moment notifications start to matter: ask once (it has to come from a key press or click).
     if (settings.notify && notifyPermission() === 'default' && !askedToNotify) {
@@ -474,7 +474,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
   });
 
   /** A prompt from the boards goes to a new worker at a free desk, or to one already at a desk. With `issue`, that worker takes the issue. */
-  function sendToWorker(title: string, text: { context?: string; initial?: string }, issue?: number) {
+  function sendToWorker(title: string, text: { context?: string; initial?: string }, issue?: string) {
     const desk = freeDesk();
     const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));
     if (!desk && !awake.length) {
@@ -499,8 +499,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
   /** What the boards' buttons do: hand an issue to a worker, queue it, call a meeting about it, go to a desk, take its card. */
   function boardActions() {
     return {
-      queue: (prompt: string, title: string, issue: number, provider?: AgentProvider, model?: string, effort?: AgentEffort) => net.send({ t: 'queue.add', prompt, title, issue, provider, model, effort }),
-      assign: (prompt: string, title: string, issue?: number) => sendToWorker(`🤖 ${title}`, { initial: prompt }, issue),
+      queue: (prompt: string, title: string, issue: string, provider?: AgentProvider, model?: string, effort?: AgentEffort) => net.send({ t: 'queue.add', prompt, title, issue, provider, model, effort }),
+      assign: (prompt: string, title: string, issue?: string) => sendToWorker(`🤖 ${title}`, { initial: prompt }, issue),
       ask: (context: string, title: string) => sendToWorker(`✍️ ${title}`, { context }),
       meeting: (preset: MeetingPreset) => parts.meeting.showMeeting(preset),
       goToDesk,

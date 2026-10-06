@@ -422,3 +422,23 @@ test("a queue worker that switches to a branch of its own takes its task's branc
   }]);
   assert.equal(q.state().tasks[0].pr?.number, 242);
 });
+
+test('a queue saved with numeric issues loads them as keys', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  writeFileSync(path.join(f.dir, 'queue.json'), JSON.stringify({ maxWorkers: 0, tasks: [{ id: 't1', title: 'Fix', prompt: 'p', issue: 12, status: 'queued', addedAt: 1 }] }));
+  const q = f.open();
+  assert.equal(q.state().tasks[0].issue, '12');
+  assert.match(q.add('Again', 'Tester', undefined, '12') ?? '', /#12 is already on the queue/);
+  assert.equal(q.dropIssue('12'), true);
+});
+
+test('a task closes on a pull request that names its issue key', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  const q = f.open();
+  assert.equal(q.add('Fix login', 'Tester', undefined, 'ERN-7'), undefined);
+  q.onPulls([{
+    number: 9, title: 'Fix login', state: 'OPEN', isDraft: false, url: 'https://example.com/pull/9', author: '', labels: [], reviewDecision: '',
+    headRefName: 'elsewhere', baseRefName: 'main', createdAt: new Date().toISOString(), updatedAt: '', additions: 0, deletions: 0, checks: 'none', body: '', closes: ['ERN-7'],
+  }]);
+  assert.equal(q.state().tasks[0].pr?.number, 9);
+});

@@ -53,8 +53,8 @@ export interface Meeting {
   parts?: string[];
   /** Review panel: the pull request under review. */
   pr?: number;
-  /** The GitHub issue it's about, when it was called from one. */
-  issue?: number;
+  /** The key of the issue it's about, when it was called from one. */
+  issue?: string;
   provider?: AgentProvider;
   model?: string;
   effort?: AgentEffort;
@@ -127,7 +127,7 @@ export interface MeetingRequest {
   roles: string[];
   parts?: string[];
   pr?: number;
-  issue?: number;
+  issue?: string;
   rounds?: number;
   provider?: AgentProvider;
   model?: string;

@@ -426,8 +426,8 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
 
   a.send({ t: 'gh.merge', number: 0, method: 'squash', deleteBranch: false });
   a.send({ t: 'gh.close', kind: 'nope', number: 3 });
-  a.send({ t: 'gh.comment', kind: 'issue', number: 3, body: '  ' });
-  assert.deepEqual(await a.take('gh.commented'), { t: 'gh.commented', kind: 'issue', number: 3, error: 'The comment is empty' });
+  a.send({ t: 'gh.comment', kind: 'issue', key: '3', body: '  ' });
+  assert.deepEqual(await a.take('gh.commented'), { t: 'gh.commented', kind: 'issue', key: '3', error: 'The comment is empty' });
   a.send({ t: 'gh.labels', kind: 'pull', number: 3, add: [], remove: [''] });
   assert.deepEqual(await a.take('gh.labeled'), { t: 'gh.labeled', kind: 'pull', number: 3, error: 'No labels to change' });
   a.send({ t: 'queue.add', prompt: 'x', provider: 'nope' });

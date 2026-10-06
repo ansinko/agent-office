@@ -9,7 +9,10 @@ export interface GhLabel {
 }
 
 export interface GhIssue {
-  number: number;
+  /** What the tracker calls it: GitHub's issue number ("12"), or a key like "ERN-123". */
+  key: string;
+  /** How it's shown: "#12" on GitHub. */
+  ref: string;
   title: string;
   state: string;
   url: string;
@@ -43,8 +46,8 @@ export interface GhPull {
   deletions: number;
   checks: 'pass' | 'fail' | 'pending' | 'none';
   body: string;
-  /** Issues it closes ("closes #12" in its description), as GitHub links them. */
-  closes: number[];
+  /** Keys of the issues it closes ("closes #12" in its description), as GitHub links them. */
+  closes: string[];
 }
 
 export interface GhState<T> {
@@ -121,9 +124,9 @@ export interface GhPullDetail {
   viewer: string;
 }
 
-/** GET /api/gh/issue?number=N */
+/** GET /api/gh/issue?key=K */
 export interface GhIssueDetail {
-  number: number;
+  key: string;
   /** OPEN or CLOSED. */
   state: string;
   body: string;
@@ -137,16 +140,28 @@ export const GH_COMMENT_MAX = 65536;
 /** Longer than any label name: GitHub stops at 50 characters, and JS counts an emoji as two. */
 export const GH_LABEL_MAX = 100;
 
+/** An issue's key from what was sent: a GitHub issue number (12, "12", "#12") or a tracker key like ERN-123. */
+export const issueKey = (v: unknown): string | undefined => {
+  const s = typeof v === 'number' && Number.isInteger(v) && v > 0 ? String(v) : typeof v === 'string' ? v.trim().replace(/^#/, '') : '';
+  return /^(?:[1-9]\d{0,9}|[A-Z][A-Z0-9_]{0,19}-[1-9]\d{0,9})$/.test(s) ? s : undefined;
+};
+
+/** How an issue is named in a sentence: #12 for a GitHub issue, a tracker's key (ERN-123) as it is. */
+export const issueRef = (key: string): string => (/^\d+$/.test(key) ? `#${key}` : key);
+
+/** An issue by its key, or a pull request by its number: what the office comments on, closes and labels. */
+export type BoardRef = { kind: 'issue'; key: string } | { kind: 'pull'; number: number };
+
 export type GitHubClientMsg =
   | { t: 'gh.refresh' }
   /** Merge a pull request; the answer comes back as gh.merged. */
   | { t: 'gh.merge'; number: number; method: GhMergeMethod; deleteBranch: boolean; auto?: boolean }
   /** Comment on an issue or a PR's conversation, as the server's gh account; answered with gh.commented. */
-  | { t: 'gh.comment'; kind: 'issue' | 'pull'; number: number; body: string }
+  | ({ t: 'gh.comment'; body: string } & BoardRef)
   /** Close an issue, or a pull request without merging it; the answer comes back as gh.closed. */
-  | { t: 'gh.close'; kind: 'issue' | 'pull'; number: number; comment?: string; reason?: GhCloseReason; deleteBranch?: boolean }
+  | ({ t: 'gh.close'; comment?: string; reason?: GhCloseReason; deleteBranch?: boolean } & BoardRef)
   /** Put labels on an issue or PR and take others off, as the server's gh account; answered with gh.labeled. */
-  | { t: 'gh.labels'; kind: 'issue' | 'pull'; number: number; add: string[]; remove: string[] };
+  | ({ t: 'gh.labels'; add: string[]; remove: string[] } & BoardRef);
 
 export type GitHubServerMsg =
   | { t: 'gh.issues'; state: GhState<GhIssue> }
@@ -154,8 +169,8 @@ export type GitHubServerMsg =
   /** Sent to whoever asked for the merge. */
   | { t: 'gh.merged'; number: number; error?: string }
   /** Sent to whoever commented: the comment as GitHub saved it, or why it wasn't. */
-  | { t: 'gh.commented'; kind: 'issue' | 'pull'; number: number; comment?: GhComment; error?: string }
+  | ({ t: 'gh.commented'; comment?: GhComment; error?: string } & BoardRef)
   /** Sent to whoever asked to close it. */
-  | { t: 'gh.closed'; kind: 'issue' | 'pull'; number: number; error?: string }
+  | ({ t: 'gh.closed'; error?: string } & BoardRef)
   /** Sent to whoever changed them: the labels it has now, or why they didn't change. */
-  | { t: 'gh.labeled'; kind: 'issue' | 'pull'; number: number; labels?: GhLabel[]; error?: string };
+  | ({ t: 'gh.labeled'; labels?: GhLabel[]; error?: string } & BoardRef);

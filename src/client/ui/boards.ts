@@ -5,6 +5,7 @@ import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
 import { openIssue } from './github/issue-window';
 import { labelChip, openLabels } from './github/labels';
+import { noteSeed, refText } from './github/notes';
 import { inProgress } from './github/progress';
 import type { BoardActions } from './github/prompts';
 import { openPull } from './github/pull-window';
@@ -26,7 +27,7 @@ const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.upda
 
 function issueColumns(items: GhIssue[]): Column<GhIssue>[] {
   const open = items.filter((i) => i.state === 'OPEN');
-  const started = open.filter((i) => inProgress(i, store.taskForIssue(i.number)));
+  const started = open.filter((i) => inProgress(i, store.taskForIssue(i.key)));
   const todo = open.filter((i) => !started.includes(i));
   return [
     { key: 'open', title: '📥 Open', items: todo },
@@ -98,7 +99,7 @@ function deskChip(w: WorkerInfo) {
 }
 
 /** Where an issue stands on the 📋 queue, for its card. */
-function queueChip(issue: number): Node | '' {
+function queueChip(issue: string): Node | '' {
   const t = store.taskForIssue(issue);
   if (!t) return '';
   const provider = providerLabel(t.provider, store.project);
@@ -111,7 +112,8 @@ function queueChip(issue: number): Node | '' {
   return t.pr ? h('span.qchip.done', {}, `🔀 PR #${t.pr.number} · ${provider}`) : '';
 }
 
-function card(n: number, title: string, meta: (Node | string)[], i: number, onclick: () => void, onLabels: () => void) {
+function card(it: GhIssue | GhPull, title: string, meta: (Node | string)[], i: number, onclick: () => void, onLabels: () => void) {
+  const n = noteSeed(it);
   return h(
     'li.card',
     {
@@ -120,8 +122,8 @@ function card(n: number, title: string, meta: (Node | string)[], i: number, oncl
       onclick,
       onkeydown: ((e: KeyboardEvent) => e.key === 'Enter' && e.target === e.currentTarget && onclick()) as EventListener,
     },
-    h('button.card-labels', { type: 'button', title: 'Change the labels', 'aria-label': `Change the labels on #${n}`, onclick: ((e: Event) => (e.stopPropagation(), onLabels())) as EventListener }, '🏷️'),
-    h('div.num', {}, `#${n}`),
+    h('button.card-labels', { type: 'button', title: 'Change the labels', 'aria-label': `Change the labels on ${refText(it)}`, onclick: ((e: Event) => (e.stopPropagation(), onLabels())) as EventListener }, '🏷️'),
+    h('div.num', {}, refText(it)),
     h('div.ttl', {}, title),
     h('div.meta', {}, ...meta.filter((m) => m !== '').map((m) => (typeof m === 'string' ? h('span', {}, m) : m))),
   );
@@ -259,7 +261,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
       for (const col of issueColumns(store.issues.items)) {
         body.append(
           column(col, all, (it, i) =>
-            card(it.number, it.title, [...labelChips(it.labels), queueChip(it.number), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : it.taken ? '🤖 handed to a worker' : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
+            card(it, it.title, [...labelChips(it.labels), queueChip(it.key), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : it.taken ? '🤖 handed to a worker' : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
           ),
         );
       }
@@ -269,7 +271,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
           column(col, all, (it, i) => {
             const w = workerForPull(store.workers.values(), it);
             return card(
-              it.number,
+              it,
               it.title,
               [
                 w ? deskChip(w) : '',

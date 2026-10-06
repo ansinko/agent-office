@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import type { GhCheck, GhCloseReason, GhComment, GhIssue, GhIssueDetail, GhLabel, GhMergeMethod, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
+import type { BoardRef, GhCheck, GhCloseReason, GhComment, GhIssue, GhIssueDetail, GhLabel, GhMergeMethod, GhPull, GhPullDetail, GhRepoInfo, GhReviewComment, GhState } from '../shared/protocol.js';
 import type { GhAs } from './signins.js';
 
 const REFRESH_MS = 90_000;
@@ -103,11 +103,11 @@ export class MergeWatch {
  * so each is marked `taken` on the board from the moment it's handed over until a list has its assignee.
  */
 export class Claims {
-  /** By issue number: when GitHub had it assigned (Infinity until it answers). */
-  private claimed = new Map<number, { at: number }>();
+  /** By issue key: when GitHub had it assigned (Infinity until it answers). */
+  private claimed = new Map<string, { at: number }>();
 
   /** A worker took issue `n`. Call what it returns once GitHub has answered, with whether it's assigned now. */
-  take(n: number): (assigned: boolean, now?: number) => void {
+  take(n: string): (assigned: boolean, now?: number) => void {
     const claim = { at: Infinity };
     this.claimed.set(n, claim);
     return (assigned, now = Date.now()) => {
@@ -117,7 +117,7 @@ export class Claims {
     };
   }
 
-  has(n: number): boolean {
+  has(n: string): boolean {
     return this.claimed.has(n);
   }
 
@@ -127,9 +127,13 @@ export class Claims {
    */
   mark(items: GhIssue[], asked = 0): GhIssue[] {
     for (const [n, claim] of this.claimed) if (claim.at < asked) this.claimed.delete(n);
-    return items.map(({ taken, ...it }) => (this.claimed.has(it.number) ? { ...it, taken: true } : it));
+    return items.map(({ taken, ...it }) => (this.claimed.has(it.key) ? { ...it, taken: true } : it));
   }
 }
+
+/** What gh calls an issue or pull request on its command line: the issue's key, the PR's number. */
+const refArg = (ref: BoardRef): string => (ref.kind === 'issue' ? ref.key : String(ref.number));
+const itemArg = (it: GhIssue | GhPull): string => ('key' in it ? it.key : String(it.number));
 
 export class GitHub {
   issues: GhState<GhIssue> = { items: [], fetchedAt: 0, loading: false };
@@ -236,17 +240,18 @@ export class GitHub {
     return gh(['pr', 'diff', String(n), '--color', 'never'], this.dir, 60_000);
   }
 
-  async issueDetail(n: number, me?: string): Promise<GhIssueDetail> {
-    const [view, viewer] = await Promise.all([gh(['issue', 'view', String(n), '--json', 'number,state,body,comments'], this.dir), me ?? this.viewer()]);
+  async issueDetail(key: string, me?: string): Promise<GhIssueDetail> {
+    const [view, viewer] = await Promise.all([gh(['issue', 'view', key, '--json', 'number,state,body,comments'], this.dir), me ?? this.viewer()]);
     const i = JSON.parse(view);
-    return { number: i.number, state: i.state, body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer };
+    return { key: String(i.number), state: i.state, body: String(i.body ?? ''), comments: commentsOf(i.comments), viewer };
   }
 
   /**
    * Comments on an issue, or on a PR's conversation (to GitHub a PR is an issue too), as `as` or
    * else the office. Returns the comment as GitHub saved it, or why it couldn't.
    */
-  async comment(kind: 'issue' | 'pull', n: number, body: string, as?: GhAs): Promise<{ comment?: GhComment; error?: string }> {
+  async comment(ref: BoardRef, body: string, as?: GhAs): Promise<{ comment?: GhComment; error?: string }> {
+    const n = refArg(ref);
     let comment: GhComment;
     try {
       // -f sends the body as a plain string: no @file reading, no {owner} filling in.
@@ -257,7 +262,7 @@ export class GitHub {
       return { error: (err as Error).message };
     }
     // The issue board counts comments; a PR's card shows when it was last updated.
-    void (kind === 'issue' ? this.refreshIssues() : this.refreshPulls());
+    void (ref.kind === 'issue' ? this.refreshIssues() : this.refreshPulls());
     return { comment };
   }
 
@@ -290,11 +295,13 @@ export class GitHub {
   }
 
   /** Closes an issue, or a pull request without merging it, optionally saying why. Returns an error. */
-  async close(kind: 'issue' | 'pull', n: number, opts: { comment?: string; reason?: GhCloseReason; deleteBranch?: boolean }, as?: GhAs): Promise<string | undefined> {
+  async close(ref: BoardRef, opts: { comment?: string; reason?: GhCloseReason; deleteBranch?: boolean }, as?: GhAs): Promise<string | undefined> {
+    const { kind } = ref;
+    const n = refArg(ref);
     try {
       const repo = await this.repoInfo();
       // --repo for the same reason as merge: --delete-branch must leave the office's checkout alone.
-      const args = [kind === 'issue' ? 'issue' : 'pr', 'close', String(n), '--repo', repo.nameWithOwner];
+      const args = [kind === 'issue' ? 'issue' : 'pr', 'close', n, '--repo', repo.nameWithOwner];
       // --flag=value, so a comment starting with "-" isn't read as a flag.
       if (opts.comment) args.push(`--comment=${opts.comment}`);
       if (kind === 'issue' && opts.reason) args.push(`--reason=${opts.reason}`);
@@ -306,7 +313,8 @@ export class GitHub {
     const refresh = () => (kind === 'issue' ? this.refreshIssues() : this.refreshPulls());
     // A refresh already in flight was asked before it closed and can still list it as open, so look again shortly after.
     void refresh().then(() => {
-      if ((kind === 'issue' ? this.issues : this.pulls).items.some((i) => i.number === n && i.state === 'OPEN')) setTimeout(() => void refresh(), 3000);
+      const items: (GhIssue | GhPull)[] = kind === 'issue' ? this.issues.items : this.pulls.items;
+      if (items.some((i) => itemArg(i) === n && i.state === 'OPEN')) setTimeout(() => void refresh(), 3000);
     });
     return undefined;
   }
@@ -331,7 +339,9 @@ export class GitHub {
    * Puts labels on an issue or PR and takes others off (to GitHub a PR is an issue too), as `as` or
    * else the office. Returns the labels it has now, or why they didn't change.
    */
-  async setLabels(kind: 'issue' | 'pull', n: number, add: string[], remove: string[], as?: GhAs): Promise<{ labels?: GhLabel[]; error?: string }> {
+  async setLabels(ref: BoardRef, add: string[], remove: string[], as?: GhAs): Promise<{ labels?: GhLabel[]; error?: string }> {
+    const { kind } = ref;
+    const n = refArg(ref);
     const path = `repos/{owner}/{repo}/issues/${n}/labels`;
     const jq = '[.[] | {name, color}]';
     let now: GhLabel[] | undefined;
@@ -373,7 +383,7 @@ export class GitHub {
    */
   private relabel<T extends GhIssue | GhPull>(kind: 'issue' | 'pull', items: T[], asked: number): T[] {
     return items.map((it) => {
-      const key = `${kind}:${it.number}`;
+      const key = `${kind}:${itemArg(it)}`;
       const r = this.relabeled.get(key);
       if (!r) return it;
       if (r.at < asked) {
@@ -389,11 +399,11 @@ export class GitHub {
    * to `as` (else the office's own gh), which is what keeps it there. Returns an error when GitHub
    * wouldn't assign it, and the card goes back to where it was.
    */
-  async claim(issue: number, as?: GhAs): Promise<string | undefined> {
+  async claim(issue: string, as?: GhAs): Promise<string | undefined> {
     const answered = this.claims.take(issue);
     this.showClaims();
     try {
-      await gh(['issue', 'edit', String(issue), '--add-assignee', '@me'], this.dir, undefined, as?.env);
+      await gh(['issue', 'edit', issue, '--add-assignee', '@me'], this.dir, undefined, as?.env);
     } catch (err) {
       answered(false);
       this.showClaims();
@@ -429,7 +439,8 @@ export class GitHub {
         gh(['issue', 'list', '--state', 'closed', '--limit', '40', '--json', fields], this.dir),
       ]);
       const fetched: GhIssue[] = [...JSON.parse(open), ...JSON.parse(closed)].map((i: any) => ({
-        number: i.number,
+        key: String(i.number),
+        ref: `#${i.number}`,
         title: i.title,
         state: i.state,
         url: i.url,
@@ -482,7 +493,10 @@ export class GitHub {
         deletions: p.deletions ?? 0,
         checks: checksOf(p.statusCheckRollup),
         body: String(p.body ?? '').slice(0, 4000),
-        closes: (p.closingIssuesReferences ?? []).map((r: any) => Number(r.number)).filter((n: number) => Number.isInteger(n) && n > 0),
+        closes: (p.closingIssuesReferences ?? [])
+          .map((r: any) => Number(r.number))
+          .filter((n: number) => Number.isInteger(n) && n > 0)
+          .map(String),
       }));
       const items = this.relabel('pull', fetched, asked);
       this.pulls = { items, fetchedAt: Date.now(), loading: false };

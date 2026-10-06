@@ -1,6 +1,6 @@
 import './meeting.css';
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
-import { fmtTokens, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
+import { fmtTokens, issueRef, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo, toast, STATUS_LABEL, type Modal } from './dom';
@@ -16,7 +16,8 @@ export interface MeetingPreset {
   prompt?: string;
   title?: string;
   pr?: number;
-  issue?: number;
+  /** The issue's key. */
+  issue?: string;
 }
 
 export interface MeetingActions {
@@ -26,8 +27,8 @@ export interface MeetingActions {
 }
 
 /** A meeting about a GitHub issue: the form filled in with it. */
-export function issueMeeting(n: number, title: string): MeetingPreset {
-  return { issue: n, title: `#${n} ${title}`, prompt: officePrompt('issue.meeting', issueVars({ number: n, title })) };
+export function issueMeeting(key: string, title: string): MeetingPreset {
+  return { issue: key, title: `${issueRef(key)} ${title}`, prompt: officePrompt('issue.meeting', issueVars({ key, title })) };
 }
 
 const PART_LABEL: Record<MeetingTurn['state'], string> = { waiting: '⏳ up next', sent: '📨 handed over', working: '💬 on it', done: '✅ written' };

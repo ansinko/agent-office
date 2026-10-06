@@ -289,8 +289,9 @@ test('reads send-home and hire requests', () => {
 
   const providers = ['claude', 'codex'] as const;
   assert.deepEqual(readHireRequest({ prompt: ' Fix it\r\n', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: 4 }, [...providers]), {
-    prompt: 'Fix it', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: 4,
+    prompt: 'Fix it', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: '4',
   });
+  assert.equal((readHireRequest({ prompt: 'x', issue: 'ERN-7' }, [...providers]) as { issue?: string }).issue, 'ERN-7');
   assert.match(readHireRequest({}, [...providers]) as string, /prompt/);
   assert.match(readHireRequest({ prompt: 'x', provider: 'grok' }, [...providers]) as string, /provider is one of claude, codex/);
   assert.match(readHireRequest({ prompt: 'x', desk: 'station-queue' }, [...providers]) as string, /desk/);

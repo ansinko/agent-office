@@ -30,5 +30,5 @@ export function spotFrom(q: URLSearchParams): ReturnType<typeof arrivalSpot> {
   const [x, y, z, rotY] = ['x', 'y', 'z', 'rotY'].map(n);
   return Number.isFinite(x) && Number.isFinite(z) ? arrivalSpot({ x, y, z, rotY }) : undefined;
 }
-export const issueNumber = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : undefined);
+export { issueKey } from '../../shared/protocol.js';
 export const COLOR_RE = /^#[0-9a-fA-F]{6}$/;

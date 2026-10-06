@@ -1,8 +1,8 @@
-import type { GhComment } from '../../../shared/protocol';
+import type { BoardRef, GhComment } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h } from '../dom';
 import { markdown } from '../markdown';
-import { commentWaiters } from './api';
+import { commentWaiters, waitKey } from './api';
 import { DRAFT_KEY, pref, savePref } from './prefs';
 
 // ---- Comment box --------------------------------------------------------------------------------
@@ -20,9 +20,9 @@ export interface CommentBox {
  * as that account rather than as you. The draft is kept per item until it is posted, so Esc or a
  * closed window doesn't lose it.
  */
-export function commentBox(kind: 'issue' | 'pull', number: number, itemUrl: string, net: Net, onPosted: (c: GhComment) => void): CommentBox {
+export function commentBox(ref: BoardRef, itemUrl: string, net: Net, onPosted: (c: GhComment) => void): CommentBox {
   const draftKey = `${DRAFT_KEY}${itemUrl}`;
-  const waitKey = `${kind}#${number}`;
+  const waitFor = waitKey(ref);
   let busy = false;
   let timer = 0;
   const ta = h('textarea', { rows: 4, placeholder: 'Leave a comment. Markdown works; ⌘/Ctrl+Enter posts it.', 'aria-label': 'Comment' }) as HTMLTextAreaElement;
@@ -69,7 +69,7 @@ export function commentBox(kind: 'issue' | 'pull', number: number, itemUrl: stri
     result.classList.remove('hidden');
   };
   const settle = () => {
-    commentWaiters.delete(waitKey);
+    commentWaiters.delete(waitFor);
     clearTimeout(timer);
     busy = false;
   };
@@ -79,7 +79,7 @@ export function commentBox(kind: 'issue' | 'pull', number: number, itemUrl: stri
     busy = true;
     result.classList.add('hidden');
     sync();
-    commentWaiters.set(waitKey, (msg) => {
+    commentWaiters.set(waitFor, (msg) => {
       settle();
       if (msg.comment) {
         ta.value = '';
@@ -95,7 +95,7 @@ export function commentBox(kind: 'issue' | 'pull', number: number, itemUrl: stri
       fail('No answer from the office. Reload the conversation to see whether the comment went through before posting it again.');
       sync();
     }, 45_000);
-    net.send({ t: 'gh.comment', kind, number, body });
+    net.send({ t: 'gh.comment', ...ref, body });
   };
 
   ta.addEventListener('input', () => (saveDraft(), sync()));

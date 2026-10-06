@@ -4,7 +4,7 @@ import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow,
 import { gh } from '../github.js';
 import type { Floor } from '../floor.js';
 import { nextFreeSeat } from '../../shared/layout.js';
-import type { WorkerInfo } from '../../shared/protocol.js';
+import { issueRef, type WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
@@ -156,13 +156,13 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   const owner = floor.workers.ownerOf(me.id);
   const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner);
   if (typeof r === 'string') return send(res, 400, { error: r });
-  ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue #${ask.issue}` : ' with a task'}`);
+  ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue ${issueRef(ask.issue)}` : ' with a task'}`);
   if (ask.issue) {
     const n = ask.issue;
     floor.queue.dropIssue(n);
     const as = owner ? ctx.signins.ghAs(owner) : undefined;
-    if (typeof as === 'string') ctx.toastFloor(floor, `Couldn't assign issue #${n} on GitHub: ${as}`, 'warn');
-    else void floor.github.claim(n, as).then((e) => e && ctx.toastFloor(floor, `Couldn't assign issue #${n} on GitHub: ${e}`, 'warn'));
+    if (typeof as === 'string') ctx.toastFloor(floor, `Couldn't assign issue ${issueRef(n)} on GitHub: ${as}`, 'warn');
+    else void floor.github.claim(n, as).then((e) => e && ctx.toastFloor(floor, `Couldn't assign issue ${issueRef(n)} on GitHub: ${e}`, 'warn'));
   }
   send(res, 200, { ok: true, worker: row(r.id) });
 }

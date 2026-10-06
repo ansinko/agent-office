@@ -1,4 +1,4 @@
-import type { ServerMsg } from '../../../shared/protocol';
+import type { BoardRef, GhIssue, GhPull, ServerMsg } from '../../../shared/protocol';
 import { store } from '../../state';
 
 // Talking to the office about GitHub: the reads (over HTTP, for the floor you're on), and the
@@ -21,17 +21,25 @@ export async function getText(url: string): Promise<string> {
   return r.text();
 }
 
+/** The issue or PR `it` is, to name it to the office. */
+export function refTo(kind: 'issue' | 'pull', it: GhIssue | GhPull): BoardRef {
+  return kind === 'issue' ? { kind, key: (it as GhIssue).key } : { kind, number: (it as GhPull).number };
+}
+
+/** What an open dialog waits under: "issue:KEY" or "pull:N". */
+export const waitKey = (ref: BoardRef): string => (ref.kind === 'issue' ? `issue:${ref.key}` : `pull:${ref.number}`);
+
 export const mergeWaiters = new Map<number, (msg: Extract<ServerMsg, { t: 'gh.merged' }>) => void>();
 export const commentWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.commented' }>) => void>();
-/** Open close dialogs, by "issue:N" or "pull:N". */
+/** Open close dialogs, by waitKey. */
 export const closeWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.closed' }>) => void>();
-/** Open label pickers, by "issue:N" or "pull:N". */
+/** Open label pickers, by waitKey. */
 export const labelWaiters = new Map<string, (msg: Extract<ServerMsg, { t: 'gh.labeled' }>) => void>();
 
 /** Main feeds server messages through here so an open merge, close or label dialog or comment box hears back. */
 export function routePullMessage(msg: ServerMsg) {
   if (msg.t === 'gh.merged') mergeWaiters.get(msg.number)?.(msg);
-  if (msg.t === 'gh.commented') commentWaiters.get(`${msg.kind}#${msg.number}`)?.(msg);
-  if (msg.t === 'gh.closed') closeWaiters.get(`${msg.kind}:${msg.number}`)?.(msg);
-  if (msg.t === 'gh.labeled') labelWaiters.get(`${msg.kind}:${msg.number}`)?.(msg);
+  if (msg.t === 'gh.commented') commentWaiters.get(waitKey(msg))?.(msg);
+  if (msg.t === 'gh.closed') closeWaiters.get(waitKey(msg))?.(msg);
+  if (msg.t === 'gh.labeled') labelWaiters.get(waitKey(msg))?.(msg);
 }

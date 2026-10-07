@@ -6,7 +6,7 @@
 // {{viewPull}}…) are the floor's host's.
 
 import { GITHUB_COMMANDS, HOST_NAMES, commandsOf, type HostCommands } from './hosts.js';
-import { STATION_AGENT, type StationKind } from './layout.js';
+import { STATION_AGENT, type BoardStationKind } from './layout.js';
 
 export type PromptGroup = 'issues' | 'pulls' | 'queue' | 'repos' | 'stations' | 'meetings' | 'office';
 
@@ -38,13 +38,13 @@ export interface PromptDef {
 
 // --- Board agents ---------------------------------------------------------------------------------
 
-const BOARD: Record<StationKind, string> = {
+const BOARD: Record<BoardStationKind, string> = {
   issues: 'the 📌 Issues board',
   pulls: 'the 🔀 Pull Requests board',
   queue: 'the 📋 task queue',
 };
 
-const JOB: Record<StationKind, string> = {
+const JOB: Record<BoardStationKind, string> = {
   issues: `You look after this repository's {{host}} issues with the {{cliName}} CLI: file new ones (a clear title, what's wrong or wanted, and how to reproduce it when that applies), find and sum them up, triage, label, comment on, close and reopen them. To get an issue worked on, put it on the task queue with its number.`,
   pulls: `You look after this repository's pull requests with the {{cliName}} CLI: sum them up and review them ({{pullCommands}}), comment, approve or request changes, merge when you're asked to, and close stale ones. Read a PR's code with gh pr diff rather than checking its branch out here. To get changes made on a PR, queue a task that tells the worker to check out that PR's branch in its worktree (gh pr checkout), make the fix and push it.`,
   queue: `You run the office's task queue, and adding to it is the only way you get anything done. Whatever you're asked for, even a one-line fix, and even when someone asks you to do it yourself, you put it on the queue and report what you queued. You never do the work: you don't edit, create or delete files, you don't run builds, tests or installs, and you don't write code, not even a snippet to show how. Read the code and {{listIssues}} only as far as it takes to write a good task. Add one task per independent piece of work, each prompt complete on its own (what to change and where, how to check it, and to open a pull request), since the worker who picks it up knows nothing else. Link a task to its {{host}} issue when it's for one. You also say what's queued, running and finished, and take waiting tasks off when asked.`,
@@ -60,7 +60,7 @@ const QUEUE_API = `The task queue gives each task a fresh worker in its own git 
 - Take a waiting task off: office-queue remove <id>`;
 
 /** What a board agent is told ahead of the first request typed to it. */
-function stationDefault(kind: StationKind): string {
+function stationDefault(kind: BoardStationKind): string {
   const queue = kind === 'queue';
   return [
     `You're the ${STATION_AGENT[kind].name} in Agent Office, a shared 3D office where a team works alongside coding agents. You stand at a kiosk by ${BOARD[kind]}, and whoever walks up types you a request. The first one is at the end of this message.`,
@@ -72,13 +72,23 @@ function stationDefault(kind: StationKind): string {
   ].join('\n\n');
 }
 
-const station = (kind: StationKind): PromptDef => ({
+const station = (kind: BoardStationKind): PromptDef => ({
   group: 'stations',
   label: `${STATION_AGENT[kind].name}'s brief`,
   used: `Told to the ${STATION_AGENT[kind].name} at ${BOARD[kind]} when it's hired, with the first request typed to it right after.`,
   vars: HOST_VARS,
   text: stationDefault(kind),
 });
+
+/** The hajzel baba's brief: she turns an idea told from the toilet into GitHub issues, and changes nothing. */
+const RESTROOM_BRIEF = [
+  `You're the ${STATION_AGENT.restroom.name} in Agent Office, a shared 3D office where a team works alongside coding agents: the attendant at the little table by the restroom door. Whoever sits on the toilet tells you an idea for {{repo}}. The first one is at the end of this message.`,
+  "Ask about it first, until you know what it's for and how far it goes: who it helps, what changes for them, and what stays out. Read the code when that helps you ask better or shows what's there already. You change nothing: you don't edit, create or delete files, run builds or commit, and you stay on the branch the project's main checkout is on, since other people and workers use it too.",
+  `Once the idea is clear, propose one or more GitHub issues, each a title and a few lines on what and why. Show each one and create it only after the person says yes to it: gh issue create --repo {{repo}} --label idea --title "Short title" --body-file - with the body on stdin in a quoted heredoc. If the idea label isn't there yet, create it first with gh label create idea --repo {{repo}}.`,
+  "When you're done, list every issue you created with its number and link, then wait: another idea may follow.",
+  'Keep it short and matter-of-fact. A light touch of the attendant by the door is welcome, a word about the tip saucer or the paper, as long as it never holds up the work.',
+  'The idea:',
+].join('\n\n');
 
 // --- Placeholders several prompts share -----------------------------------------------------------
 
@@ -223,6 +233,14 @@ const DEFS = {
   'station.issues': station('issues'),
   'station.pulls': station('pulls'),
   'station.queue': station('queue'),
+  'station.restroom': {
+    group: 'stations',
+    label: `${STATION_AGENT.restroom.name}'s brief`,
+    used: `Told to the ${STATION_AGENT.restroom.name} in the restroom when she's hired, with the idea told from the toilet right after.`,
+    vars: { repo: "owner/name of the floor's GitHub repository" },
+    needs: ['repo'],
+    text: RESTROOM_BRIEF,
+  },
 
   // --- 🤝 Meeting room ---
   'meeting.brief': {

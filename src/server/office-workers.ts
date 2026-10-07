@@ -10,6 +10,7 @@ import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { workerPr } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
 import type { CodeHost } from './hosts/types.js';
+import { workerRestroomRefusal } from './restroom.js';
 
 /** One worker as an agent sees it: enough to pick the ones to send home, and say why. */
 export interface WorkerRow {
@@ -155,6 +156,8 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   if (b.worktree !== undefined && typeof b.worktree !== 'boolean') return 'worktree is true or false';
   // Board kiosks and the meeting table seat their own: see station.prompt and meetings.ts.
   const seat = typeof b.desk === 'string' ? DESK_BY_ID.get(b.desk) : undefined;
+  const restroom = typeof b.desk === 'string' ? workerRestroomRefusal(b.desk) : undefined;
+  if (restroom) return restroom;
   if (b.desk !== undefined && (!seat || seat.station || seat.room)) return "desk is a desk or bean bag's id, like desk-3";
   const issue = b.issue === undefined ? undefined : issueKey(b.issue);
   if (b.issue !== undefined && issue === undefined) return 'issue is an issue number or key';

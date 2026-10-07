@@ -72,7 +72,8 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   function use(it: Interactable | null, key: DeskKey, note = aimedNote): boolean {
     const worker = it?.deskId ? store.workerAtDesk(it.deskId) : undefined;
     const room = !!(it?.deskId && plan().byId.get(it.deskId)?.room);
-    if (!interactionAvailable(it, key, { worker, room, note, carrying: !!core.carrying })) return false;
+    const seatKey = it ? parts.seating.seatKey(it) : undefined;
+    if (!interactionAvailable(it, key, { worker, room, note, carrying: !!core.carrying, seatKey })) return false;
     reach();
     interact(it, key, note);
     return true;

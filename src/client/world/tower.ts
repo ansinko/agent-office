@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, FLOOR, ROOF_BAR, SLAB, STAGE, STOREY, STREET_Y, WALL_HEIGHT, WALL_T, WINDOWS, WING, wingMinZ, wingRowZ, type Opening, type Side } from '../../shared/layout';
+import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, FLOOR, ROOF_BAR, SLAB, STAGE, STOREY, STREET_Y, WALL_HEIGHT, WALL_T, WINDOWS, WING, wingMinZ, type Opening, type Side } from '../../shared/layout';
+import { RESTROOM_WINDOW } from '../../shared/restroom';
 import type { Collider } from './types';
 import type { Fixture } from './office/fixture';
 import { bulb, type NightParts } from './outside';
@@ -26,9 +27,9 @@ export interface Tower {
   set(index: number, count: number, wings?: readonly number[]): void;
 }
 
-/** A window in each row of a back office, in the building's east wall (world/office/wing.ts cuts the same ones). */
+/** The back office's window in the building's east wall, the restroom's (world/office/wing.ts cuts the same one). */
 export function wingWindows(level: number): Opening[] {
-  return Array.from({ length: level }, (_, i) => ({ wall: 'east' as const, u: wingRowZ(i + 1), width: 2.4, y0: 1.1, y1: 3.3 }));
+  return level > 0 ? [RESTROOM_WINDOW] : [];
 }
 
 /** Where the posts under a back office stand: at the back corners of each row. */

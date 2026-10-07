@@ -10,7 +10,7 @@ export interface DocFile {
   size: number;
   /** Last modified (on a branch: last committed), ms since epoch. */
   mtime: number;
-  /** The project's .bookshelf.json leaves it off the shelf until you filter for it. */
+  /** The floor's bookshelf.json leaves it off the shelf until you filter for it. */
   hidden?: boolean;
 }
 
@@ -31,12 +31,15 @@ export interface DocList {
   /** The one these files are from, and the others it can read from. */
   source: string;
   sources: DocSource[];
-  /** The doc .bookshelf.json opens first, when it's on the shelf. */
+  /** The doc bookshelf.json opens first, when it's on the shelf. */
   start?: string;
 }
 
-/** The project's own say in its shelf: a file at the top of the project. */
-export const SHELF_CONFIG = '.bookshelf.json';
+/**
+ * How the shelf is laid out, kept with the floor's own data (`.agent-office/bookshelf.json`) rather
+ * than in the project, so a project never needs to know about the office.
+ */
+export const SHELF_CONFIG = 'bookshelf.json';
 
 export interface ShelfConfig {
   /** The doc to open first, rather than the README. */
@@ -45,7 +48,7 @@ export interface ShelfConfig {
   hide: string[];
 }
 
-/** .bookshelf.json, as far as it makes sense: anything it doesn't say, or says wrong, is left out. */
+/** bookshelf.json, as far as it makes sense: anything it doesn't say, or says wrong, is left out. */
 export function parseShelfConfig(text: string | undefined): ShelfConfig {
   let raw: unknown;
   try {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { KIOSK, STATION_AGENT, deskSeat, type BoardStationKind, type DeskDef } from '../../../shared/layout';
 import { BENCH_OUT, COUNCIL, type MapPlan } from '../../../shared/maps';
 import { boxFootprint } from '../../../shared/maps/props';
 import { deskPoint } from '../../../shared/nav';
@@ -133,11 +133,12 @@ export function buildCouncil(kit: Kit, plan: MapPlan): { board?: THREE.Mesh; sig
   return { board, sign };
 }
 
-const LECTERN_SIGN: Record<StationKind, string> = { issues: '📜 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
+const LECTERN_SIGN: Record<BoardStationKind, string> = { issues: '📜 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
 
 /** A board agent's lectern (a scribe's desk): the agent stands behind it, as at the office's kiosk. */
 export function lectern(kit: Kit, def: DeskDef): DeskView {
-  const kind = def.station!;
+  // A lectern is a board agent's: the restroom has a table of its own.
+  const kind = def.station as BoardStationKind;
   const g = new THREE.Group();
   g.position.set(def.x, 0, def.z);
   g.rotation.y = def.rotY;

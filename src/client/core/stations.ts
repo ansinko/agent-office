@@ -1,6 +1,7 @@
 /** The board agents: what each is for, and the ones waiting by their boards before anyone has asked them anything. */
-import { STATION_AGENT, type StationKind } from '../../shared/layout';
-import { Worker } from '../world/character';
+import { STATION_AGENT, type DeskDef, type StationKind } from '../../shared/layout';
+import type { MapPlan } from '../../shared/maps';
+import { Worker, type Outfit } from '../world/character';
 import type { DeskView } from '../world/types';
 import type { World } from '../world/world';
 import { noOutline } from './outline';
@@ -10,7 +11,14 @@ export const STATION_INFO: Record<StationKind, { icon: string; offer: string; do
   issues: { icon: '📌', offer: 'Ask me about issues', does: 'I file, find, triage, label and close them', example: 'File an issue: the dog walks straight through the jukebox' },
   pulls: { icon: '🔀', offer: 'Ask me about PRs', does: 'I sum up, review, comment on and merge them', example: 'Review the newest PR and tell me if it’s ready to merge' },
   queue: { icon: '📋', offer: 'Ask me to queue work', does: 'I turn it into tasks for fresh workers', example: 'Queue every open bug issue, most important first' },
+  restroom: { icon: '🧻', offer: 'Have a seat and tell me', does: 'I turn your ideas into GitHub issues', example: 'The dog could fetch the newspaper every morning' },
 };
+
+/** What a worker at `def` wears on map `plan`: the hajzel baba her apron, everyone else the map's outfit. */
+export function outfitAt(plan: MapPlan, def: DeskDef | undefined): Outfit | null {
+  if (def?.station === 'restroom') return 'attendant';
+  return plan.agents.outfit === 'peasant' ? 'peasant' : null;
+}
 
 /** A board agent waiting by its board before anyone has asked it anything (see buildKiosk), and where. */
 export interface IdleAgent {
@@ -18,18 +26,19 @@ export interface IdleAgent {
   view: DeskView;
 }
 
-/** The board agents waiting by their boards in `w`. */
+/** The agents waiting at the stations `w` has put up (World.desks), the board agents by their boards among them. */
 export function idleAgentsIn(w: World): IdleAgent[] {
-  return w.plan.stations.map((def) => {
+  return w.plan.stations.flatMap((def) => {
+    const view = w.desks.get(def.id);
+    if (!view) return [];
     const kind = def.station!;
     const agent = STATION_AGENT[kind];
     const model = new Worker(agent.name, agent.color);
     model.setStatus('idle', false);
     model.setTask({ name: STATION_INFO[kind].offer, summary: STATION_INFO[kind].does });
-    model.setOutfit(w.plan.agents.outfit === 'peasant' ? 'peasant' : null);
-    const view = w.desks.get(def.id)!;
+    model.setOutfit(outfitAt(w.plan, def));
     view.vacancy.children[0].add(model.root);
     noOutline(model.root);
-    return { model, view };
+    return [{ model, view }];
   });
 }

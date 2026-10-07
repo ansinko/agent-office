@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Theme } from '../../../shared/protocol';
-import { GRIME, beardColor, elfBoot, elfHat, elfWorker, zombieWorker, type Beard, type PeasantGarb } from '../costumes';
+import { GRIME, beardColor, elfBoot, elfHat, elfWorker, peasantGarb, zombieWorker, type Beard, type PeasantGarb } from '../costumes';
 import type { WorkerRig } from './rig';
+import { attendantGarb } from './worker-attendant';
 
 // Dressing a worker up: for a holiday, and for how worn out it's getting.
 
@@ -43,7 +44,20 @@ export function growBeard(w: Beard, age: number) {
   w.bags.visible = age > 0.6;
 }
 
-/** Its peasant's clothes, `age` of the way worn out: grubbier, and patched. */
+/** What a worker can wear over its bean (see Worker.setOutfit): the castle's peasant garb, or the hajzel baba's apron and headscarf. */
+export type Outfit = 'peasant' | 'attendant';
+/** The clothes it has on, and which outfit they are. */
+export type Garb = PeasantGarb & { outfit: Outfit };
+
+/** The clothes for `outfit`, for a worker of `color` (which picks a peasant's cloth). */
+export function garbFor(outfit: Outfit, color: string): Garb {
+  if (outfit === 'attendant') return { ...attendantGarb(), outfit };
+  let seed = 0;
+  for (const ch of color) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
+  return { ...peasantGarb(seed), outfit };
+}
+
+/** Its clothes, `age` of the way worn out: grubbier, and patched. */
 export function wearGarb(garb: PeasantGarb, age: number) {
   garb.cloth.color.copy(garb.clean).lerp(GRIME, 0.5 * age);
   for (const p of garb.patches) p.part.visible = age >= p.at;

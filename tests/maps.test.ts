@@ -5,15 +5,18 @@ import path from 'node:path';
 import { CASTLE } from '../src/shared/maps/castle.js';
 import { STATION } from '../src/shared/maps/station.js';
 import { DESK_BY_ID } from '../src/shared/layout.js';
+import { RESTROOM_DESK } from '../src/shared/restroom.js';
 import { NavGrid, pathLength } from '../src/shared/nav.js';
 import { BUILTIN_MAPS, DEFAULT_DAIS, OFFICE_PLAN, checkCustomMaps, mapChoices, planMap, planOf, seatHereOn, type MapConfig } from '../src/shared/maps/index.js';
 import { clockWork, workedMs } from '../src/server/workers.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 
-test('every built-in map places every seat the office has, by the same ids', () => {
+test('every built-in map places every seat the office has, by the same ids, but the restroom', () => {
+  // The hajzel baba's table is the office's alone: a map of its own has no restroom.
+  const seats = new Set([...DESK_BY_ID.keys()].filter((id) => id !== RESTROOM_DESK));
   for (const config of BUILTIN_MAPS) {
     const plan = planMap(config);
-    assert.deepEqual(new Set(plan.byId.keys()), new Set(DESK_BY_ID.keys()), `${config.id} has the office's seats`);
+    assert.deepEqual(new Set(plan.byId.keys()), seats, `${config.id} has the office's seats`);
     for (const [id, d] of plan.byId) {
       const office = DESK_BY_ID.get(id)!;
       assert.equal(!!d.station, !!office.station, `${id} is a kiosk on both`);
@@ -85,7 +88,7 @@ test("a map that can't be used says why, and the building stays on the office", 
   ]);
   const why = Object.fromEntries(checked.map((m) => [m.file, m.error ?? '']));
   assert.match(why['office.json'], /office is built in code/);
-  assert.match(why['small.json'], /seat 4, and a map needs 32/);
+  assert.match(why['small.json'], /seat 4, and a map needs 28/);
   assert.match(why['far.json'], /outside the hall/);
   assert.match(why['thing.json'], /spaceship/);
   assert.match(why['dupe.json'], /built-in map/);

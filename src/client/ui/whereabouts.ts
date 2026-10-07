@@ -33,8 +33,8 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, p
   if (p.floor === ROOF) return onTheRoof(p);
   // On a map of its own, the office's rooms aren't where they'd be.
   if (!office) return undefined;
-  // Through the north wall in the back office: nobody gets there unless the floor's built out.
-  if (p.y > -1 && inWing(p.x, p.z, WING.rows)) return '🏗️ in the back office';
+  // Through the north wall in the back office, the restroom.
+  if (p.y > -1 && inWing(p.x, p.z, WING.rows)) return '🚻 in the restroom';
   // Down on the street, or out the back door on the stairs down to it.
   if (p.y < -1 || p.x < FLOOR.minX || p.x > FLOOR.maxX || p.z < FLOOR.minZ) return '🚶 outside';
   if (p.z > FLOOR.maxZ) return p.x >= BALCONY.minX && p.x <= BALCONY.maxX ? '🌇 on the balcony' : '🚶 outside';

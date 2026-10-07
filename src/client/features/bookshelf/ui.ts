@@ -60,7 +60,7 @@ function rate(at: number[], text: string): number {
 
 /**
  * The docs that match every word of `query`, best first. For none, the ones on the shelf in shelf
- * order: those .bookshelf.json hides only turn up once you filter for them.
+ * order: those the floor's bookshelf.json hides only turn up once you filter for them.
  */
 export function filterDocs(files: DocFile[], query: string): Hit[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -204,7 +204,7 @@ export function openBookshelf(deps: ShelfDeps) {
   page.append(h('div.bs-empty', {}, h('span.spinner')));
 
   let files: DocFile[] = [];
-  /** The doc .bookshelf.json opens first. */
+  /** The doc bookshelf.json opens first. */
   let start: string | undefined;
   let shown: Hit[] = [];
   /** Which of `shown` ↑ ↓ are on. */

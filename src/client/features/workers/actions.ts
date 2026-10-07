@@ -11,7 +11,6 @@ import type { AgentEffort, AgentProvider, WorkerInfo } from '../../../shared/pro
 import { isAsleep, isBusy } from '../../../shared/status';
 import type { Ctx, Hint } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
-import { seatBuilt } from '../../core/floors';
 import { aside, key } from '../../core/hint';
 import type { Parts } from '../../core/parts';
 import { STATION_INFO } from '../../core/stations';
@@ -51,7 +50,6 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     let best: string | null = null;
     let bestD = Infinity;
     for (const d of plan().desks) {
-      if (!seatBuilt(d.id)) continue;
       if (store.workerAtDesk(d.id)) continue;
       const dist = Math.hypot(d.x - player.pos.x, d.z - player.pos.z);
       if (dist < bestD) {
@@ -62,9 +60,9 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return best ?? firstFreeSeat() ?? null;
   }
 
-  /** The first seat nobody's at, in the map's order: the desks (as far as the floor's built out), then the overflow seats. */
+  /** The first seat nobody's at, in the map's order: the desks, then the overflow seats. */
   function firstFreeSeat(): string | undefined {
-    return [...plan().desks, ...plan().overflow].find((d) => seatBuilt(d.id) && !store.workerAtDesk(d.id))?.id;
+    return [...plan().desks, ...plan().overflow].find((d) => !store.workerAtDesk(d.id))?.id;
   }
 
   let askedToNotify = false;

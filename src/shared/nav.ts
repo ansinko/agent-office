@@ -1,10 +1,10 @@
 // Getting around a floor on a coarse grid, round the furniture: the dog's walks (server/dog.ts), a
 // worker's way out when it's sent home, and on a map of its own (see shared/maps), a worker's walks
 // about the hall. The office's grid is below; a map builds one from its plan (NavGrid).
-// An office floor built out into the back office (see WING) has more of it to get round: the office's
-// helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
+// An office floor has its back office (see WING), the restroom, to get round too: the office's helpers
+// take how many rows it's built out (`wing`, 0 on the roof), and each level gets a grid of its own.
 
-import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
+import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, RESTROOM, STAIRS, WHITEBOARD, WING, DESKS, KIOSK_STATIONS, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 
 export type Pt = [number, number];
@@ -47,7 +47,7 @@ function obstacles(wing: number): Obstacles {
   const circles: Circle[] = [];
   const hw = DESK_SIZE.width / 2;
   const hd = DESK_SIZE.depth / 2;
-  for (const d of builtDesks(wing)) {
+  for (const d of DESKS) {
     // Desks face ±z, so their tops are axis-aligned.
     rects.push([d.x - hw, d.x + hw, d.z - hd, d.z + hd]);
     const [cx, cz] = deskPoint(d, 0, 0.9);
@@ -85,7 +85,7 @@ function obstacles(wing: number): Obstacles {
     rects.push([Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]);
   }
   // The board agents' kiosks, and the agent standing behind each one.
-  for (const k of STATIONS) {
+  for (const k of KIOSK_STATIONS) {
     const corners = [deskPoint(k, -KIOSK.width / 2, -KIOSK.depth / 2), deskPoint(k, KIOSK.width / 2, -KIOSK.depth / 2), deskPoint(k, -KIOSK.width / 2, KIOSK.stand + 0.35), deskPoint(k, KIOSK.width / 2, KIOSK.stand + 0.35)];
     const xs = corners.map(([x]) => x);
     const zs = corners.map(([, z]) => z);
@@ -106,7 +106,25 @@ function obstacles(wing: number): Obstacles {
     const [cx, cz] = deskPoint(d, 0, 0.85);
     circles.push([cx, cz, 0.18]);
   }
+  if (wing > 0) restroomObstacles(rects, circles);
   return { rects, circles };
+}
+
+/**
+ * What's in the restroom, where RESTROOM puts it: the wall to the room either side of its door, the hajzel baba's table and her chair, the cubicle's walls either side of its
+ * door, the toilet, and the sink.
+ */
+function restroomObstacles(rects: Rect[], circles: Circle[]) {
+  const { door, table, cubicle, toilet, sink } = RESTROOM;
+  const front: [number, number] = [RESTROOM.maxZ - RESTROOM.wall, RESTROOM.maxZ];
+  rects.push([RESTROOM.minX, door.x - door.width / 2, ...front], [door.x + door.width / 2, RESTROOM.maxX, ...front]);
+  rects.push([table.x - table.width / 2, table.x + table.width / 2, table.z - table.depth / 2, table.z + table.depth / 2]);
+  circles.push([table.x + table.chair, table.z, 0.3]);
+  const c = cubicle.wall / 2;
+  rects.push([cubicle.minX - c, cubicle.minX + c, RESTROOM.minZ, cubicle.maxZ]);
+  rects.push([cubicle.minX, cubicle.door.x - cubicle.door.width / 2, cubicle.maxZ - c, cubicle.maxZ + c], [cubicle.door.x + cubicle.door.width / 2, RESTROOM.maxX, cubicle.maxZ - c, cubicle.maxZ + c]);
+  circles.push([toilet.x, toilet.z, toilet.r]);
+  rects.push([RESTROOM.minX, sink.x + sink.depth / 2, sink.z - sink.width / 2, sink.z + sink.width / 2]);
 }
 
 /** Whether (x, z) is too close to anything in the way, or to the walls, to stand in. */
@@ -278,11 +296,8 @@ export class NavGrid {
         ? [deskPoint(seat, side * 1.05, 0.1), deskPoint(seat, side * 1.05, 1.25)]
         : seat.station
           ? [deskPoint(seat, side * 0.95, KIOSK.stand), deskPoint(seat, side * 0.95, -1)]
-          : seat.wing
-            ? // In the back office the chair has its back to a wall or the next row: out to the side of it instead.
-              [deskPoint(seat, side * 0.7, 0.95), deskPoint(seat, side * 0.95, 1.25)]
-            : // At the meeting table there's less room behind the chair, before the glass.
-              [deskPoint(seat, side * 0.7, 0.95), deskPoint(seat, side * 0.7, seat.room ? 1.4 : 1.75)];
+          : // At the meeting table there's less room behind the chair, before the glass.
+            [deskPoint(seat, side * 0.7, 0.95), deskPoint(seat, side * 0.7, seat.room ? 1.4 : 1.75)];
       // A bean bag or a kiosk can stand with one side up against something (the elevator, by the queue).
       const blocked = !!(seat.beanbag || seat.station) && !this.walkable(down[0], down[1]);
       const pts = [down, ...this.route(back, to)];
@@ -318,7 +333,7 @@ export function officeNav(wing = 0): NavGrid {
   return (OFFICE_NAVS[level] ??= new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level), on));
 }
 
-/** The office floor as it is until it's built out. */
+/** The office floor with no back office. */
 export const OFFICE_NAV = officeNav(0);
 
 export function walkable(x: number, z: number, wing = 0): boolean {

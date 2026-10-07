@@ -5,7 +5,7 @@
  */
 import type * as THREE from 'three';
 import type { MapPlan } from '../../shared/maps';
-import type { CarriedIssue, GhIssue, ServerMsg } from '../../shared/protocol';
+import type { CarriedIssue, Issue, ServerMsg } from '../../shared/protocol';
 import type { Grip } from '../features/climbing/controller';
 import type { DeskKey } from '../interaction';
 import type { Net } from '../net';
@@ -65,7 +65,7 @@ export interface OfficeInteraction {
   hint: Hint;
   key: DeskKey;
   /** The issue note you're pointing at on the issues board, if any. */
-  note: GhIssue | null;
+  note: Issue | null;
 }
 
 export interface Ctx {

@@ -1,6 +1,7 @@
 import './markdown.css';
 import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { store } from '../state';
 import { h } from './dom';
 
 // GitHub-flavored markdown for issue and PR text: rendered by marked, then sanitized by DOMPurify
@@ -101,7 +102,8 @@ export function markdown(src: string, itemUrl?: string): HTMLElement {
   const repoUrl = itemUrl ? repoUrlOf(itemUrl) : undefined;
   if (itemUrl && repoUrl) absolutize(el, itemUrl, repoUrl);
   alerts(el);
-  linkify(el, repoUrl);
+  // #123 and @name are GitHub's; on another host they stay as written.
+  if ((store.currentFloor()?.host?.kind ?? 'github') === 'github') linkify(el, repoUrl);
   return el;
 }
 

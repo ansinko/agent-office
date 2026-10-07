@@ -4,11 +4,12 @@
 
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
-import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, Pull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
+import { isAgentEffort, isAgentProvider, issueKey } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { workerPr } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
+import type { CodeHost } from './hosts/types.js';
 import { workerRestroomRefusal } from './restroom.js';
 
 /** One worker as an agent sees it: enough to pick the ones to send home, and say why. */
@@ -48,10 +49,10 @@ export interface WorkerRow {
 
 /** What a floor knows about its workers' pull requests. */
 export interface PullsView {
-  pulls: GhPull[];
+  pulls: Pull[];
   tasks: QueueTask[];
   /** Another floor's pull requests, for a worker across repositories. */
-  pullsOf?: (floor: string) => GhPull[] | undefined;
+  pullsOf?: (floor: string) => Pull[] | undefined;
 }
 
 /** How long a task or activity line gets. */
@@ -140,7 +141,8 @@ export interface HireRequest {
   /** Its own git worktree; undefined leaves it to the office (yes, in a git checkout). */
   worktree?: boolean;
   desk?: string;
-  issue?: number;
+  /** The issue's key. */
+  issue?: string;
 }
 
 export function readHireRequest(body: unknown, providers: AgentProvider[]): HireRequest | string {
@@ -157,7 +159,8 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   const restroom = typeof b.desk === 'string' ? workerRestroomRefusal(b.desk) : undefined;
   if (restroom) return restroom;
   if (b.desk !== undefined && (!seat || seat.station || seat.room)) return "desk is a desk or bean bag's id, like desk-3";
-  if (b.issue !== undefined && !(Number.isSafeInteger(b.issue) && (b.issue as number) > 0)) return 'issue is an issue number';
+  const issue = b.issue === undefined ? undefined : issueKey(b.issue);
+  if (b.issue !== undefined && issue === undefined) return 'issue is an issue number or key';
   return {
     prompt,
     ...(b.provider !== undefined ? { provider: b.provider as AgentProvider } : {}),
@@ -165,13 +168,14 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
     ...(b.effort !== undefined ? { effort: b.effort as AgentEffort } : {}),
     ...(typeof b.worktree === 'boolean' ? { worktree: b.worktree } : {}),
     ...(typeof b.desk === 'string' ? { desk: b.desk } : {}),
-    ...(b.issue !== undefined ? { issue: b.issue as number } : {}),
+    ...(issue !== undefined ? { issue } : {}),
   };
 }
 
 /**
  * A request to say which pull request is a worker's, read from its JSON body: its number, or its
- * URL (then `repo` is whose it is). With neither and unlink: true, the worker's is taken off.
+ * URL on the floor's `host` (then `repo` is whose it is). With neither and unlink: true, the worker's
+ * is taken off.
  */
 export interface PrRequest {
   /** Whose: the worker asking, when it doesn't say. */
@@ -180,16 +184,16 @@ export interface PrRequest {
   repo?: string;
 }
 
-export function readPrRequest(body: unknown): PrRequest | string {
+export function readPrRequest(body: unknown, host: Pick<CodeHost, 'parsePrUrl'>): PrRequest | string {
   const b = (body ?? {}) as { worker?: unknown; pr?: unknown; unlink?: unknown };
   if (b.worker !== undefined && (typeof b.worker !== 'string' || !b.worker.trim())) return 'worker is a worker name or id';
   const who = typeof b.worker === 'string' ? { worker: b.worker.trim() } : {};
   if (b.unlink === true) return b.pr === undefined ? who : 'Give pr or unlink: true, not both';
   const text = typeof b.pr === 'string' ? b.pr.trim() : '';
-  const url = /^https?:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)(?:[/?#].*)?$/i.exec(text);
-  const n = typeof b.pr === 'number' ? b.pr : url ? Number(url[2]) : /^#?\d+$/.test(text) ? Number(text.replace('#', '')) : NaN;
+  const url = host.parsePrUrl(text);
+  const n = typeof b.pr === 'number' ? b.pr : url ? url.number : /^#?\d+$/.test(text) ? Number(text.replace('#', '')) : NaN;
   if (!Number.isSafeInteger(n) || n < 1) return "Say which pull request: pr, its number or its URL (or unlink: true to take the worker's off)";
-  return { ...who, pr: n, ...(url ? { repo: url[1] } : {}) };
+  return { ...who, pr: n, ...(url ? { repo: url.repo } : {}) };
 }
 
 // --- The MCP server -------------------------------------------------------------------------------

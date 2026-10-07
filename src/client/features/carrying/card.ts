@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import type { CarriedIssue } from '../../../shared/protocol';
+import { issueRef, type CarriedIssue } from '../../../shared/protocol';
 import { NOTE_COLORS, PINS, wrap } from '../boards/world';
 import { toon, toonUnique } from '../../world/toon';
+import { keySeed } from '../../ui/board-windows/notes';
 
 const W = 320;
 const H = 240;
@@ -9,24 +10,25 @@ const FONT = 'Nunito, ui-rounded, system-ui, sans-serif';
 
 /**
  * An issue's sticky note, taken off the issues board: a thin card in the note's color, with the pin,
- * the number and the title on its front (+z) and plain paper behind. `width` is in meters.
+ * the issue and the title on its front (+z) and plain paper behind. `width` is in meters.
  */
 function issueCard(card: CarriedIssue, width: number): THREE.Mesh {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const g = canvas.getContext('2d')!;
-  const color = NOTE_COLORS[card.issue % NOTE_COLORS.length];
+  const seed = keySeed(card.issue);
+  const color = NOTE_COLORS[seed % NOTE_COLORS.length];
   g.fillStyle = color;
   g.fillRect(0, 0, W, H);
   g.fillStyle = '#2b2d42';
   g.font = `900 52px ${FONT}`;
-  g.fillText(`#${card.issue}`, 22, 84);
+  g.fillText(issueRef(card.issue), 22, 84);
   g.font = `700 28px ${FONT}`;
   wrap(g, card.title, W - 44, 4).forEach((line, i) => g.fillText(line, 22, 128 + i * 30));
   g.beginPath();
   g.arc(W / 2, 20, 12, 0, Math.PI * 2);
-  g.fillStyle = PINS[card.issue % PINS.length];
+  g.fillStyle = PINS[seed % PINS.length];
   g.fill();
   g.lineWidth = 3;
   g.strokeStyle = '#2b2d42';
@@ -46,7 +48,7 @@ function issueCard(card: CarriedIssue, width: number): THREE.Mesh {
 /** The issue card someone holds, under `parent`: swapped for another card, or dropped (null). */
 export class HeldCard {
   private mesh: THREE.Mesh | null = null;
-  private issue = 0;
+  private issue = '';
 
   constructor(
     private parent: THREE.Object3D,
@@ -58,7 +60,7 @@ export class HeldCard {
   }
 
   set(card: CarriedIssue | null | undefined) {
-    if ((card?.issue ?? 0) === this.issue) return;
+    if ((card?.issue ?? '') === this.issue) return;
     if (this.mesh) {
       this.parent.remove(this.mesh);
       this.mesh.geometry.dispose();
@@ -67,7 +69,7 @@ export class HeldCard {
       face.dispose();
       this.mesh = null;
     }
-    this.issue = card?.issue ?? 0;
+    this.issue = card?.issue ?? '';
     if (!card) return;
     this.mesh = issueCard(card, this.width);
     this.parent.add(this.mesh);

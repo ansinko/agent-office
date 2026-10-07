@@ -117,11 +117,11 @@ export const floor: Slice = {
       sc.version++;
       return ['screens'];
     },
-    'gh.issues'(s, m) {
+    'board.issues'(s, m) {
       s.issues = m.state;
       return ['issues'];
     },
-    'gh.pulls'(s, m) {
+    'board.pulls'(s, m) {
       s.pulls = m.state;
       return ['pulls'];
     },

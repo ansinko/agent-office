@@ -5,8 +5,8 @@ import path from 'node:path';
 import type { WorkerInfo } from '../../shared/protocol.js';
 import { DESK_BY_ID } from '../../shared/layout.js';
 import { isBusy } from '../../shared/status.js';
-import { gh } from '../github.js';
-import type { GhAs } from '../signins.js';
+import { hostFor } from '../hosts/registry.js';
+import type { CodeHost, HostAs } from '../hosts/types.js';
 import { Worktrees } from '../worktrees.js';
 import { run } from './process.js';
 import type { OpenedPr, Worker, WorkerContext } from './types.js';
@@ -18,47 +18,12 @@ const PR_TASK_MAX = 2500;
 /** Around the list of a change's pull requests in each of their descriptions, so it can be brought up to date. */
 const RELATED_START = '<!-- agent-office:related -->';
 const RELATED_END = '<!-- /agent-office:related -->';
-/** `gh pr create` being run, alone or in a longer line: not one that only names it (a grep for it, a quoted string). */
-const CREATES_PR = /(?:^|[\s;&|(])gh\s+pr\s+create\b/;
 /** How many of the pull requests a worker opened before its latest are remembered. */
 const MAX_PAST_PRS = 20;
-const PR_URL = /https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/g;
 
-/**
- * The pull request a worker opened itself, read off a shell command it ran and what that printed:
- * `gh pr create` prints the new pull request's URL, or the one its branch already had. The last one
- * printed is it.
- */
-export function ownPr(command: unknown, output: string): { repo: string; number: number; url: string } | undefined {
-  if (typeof command !== 'string' || !CREATES_PR.test(command)) return undefined;
-  const last = [...output.matchAll(PR_URL)].pop();
-  return last && { repo: last[1], number: Number(last[2]), url: last[0] };
-}
-
-async function findOpenPr(branch: string, cwd: string): Promise<{ number: number; url: string } | undefined> {
-  const out = await gh(['pr', 'list', '--head', branch, '--state', 'open', '--limit', '1', '--json', 'number,url'], cwd);
-  const found = (JSON.parse(out || '[]') as { number: number; url: string }[])[0];
-  return found ? { number: found.number, url: found.url } : undefined;
-}
-
-/** `gh pr create` for a pushed branch; resolves to the new pull request. */
-async function createPr(branch: string, base: string | undefined, title: string, body: string, cwd: string, as?: GhAs): Promise<{ number: number; url: string }> {
-  const out = await gh(['pr', 'create', '--head', branch, ...(base ? ['--base', base] : []), '--title', title, '--body', body], cwd, 60_000, as?.env);
-  const url = out.trim().split('\n').pop() ?? '';
-  const number = Number(/\/pull\/(\d+)/.exec(url)?.[1]);
-  if (!number) throw new Error(`gh did not return a pull request URL (${truncate(out, 120)})`);
-  return { number, url };
-}
-
-/** owner/name#12 for a pull request on GitHub (which links it with its title), else its URL. */
-function prRef(url: string): string {
-  const m = /github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/.exec(url);
-  return m ? `${m[1]}#${m[2]}` : url;
-}
-
-/** The list of a change's pull requests across repositories, for the description of the one at `self`. */
-export function relatedBlock(prs: { repo?: string; url: string }[], self: string, branch: string): string {
-  const lines = prs.map((p) => `- ${p.repo ? `**${p.repo}**: ` : ''}${prRef(p.url)}${p.url === self ? ' (this one)' : ''}`);
+/** The list of a change's pull requests across repositories, for the description of the one at `self`, named as `host` links them. */
+export function relatedBlock(prs: { repo?: string; url: string }[], self: string, branch: string, host: Pick<CodeHost, 'prRef'>): string {
+  const lines = prs.map((p) => `- ${p.repo ? `**${p.repo}**: ` : ''}${host.prRef(p.url)}${p.url === self ? ' (this one)' : ''}`);
   return [RELATED_START, `**One change across ${prs.length} repositories**, each on \`${branch}\`: review and merge them together.`, '', ...lines, RELATED_END].join('\n');
 }
 
@@ -97,17 +62,23 @@ function draftPr(info: WorkerInfo, commits: string[], by: string, other?: { home
 export class WorkerPrs {
   /** owner/name of the floor's project on GitHub, looked up the first time a worker opens a pull request itself. */
   private origin?: { repo: string | undefined };
+  /** Where the floor's pull requests are, read off its origin the first time one is needed. */
+  private code?: CodeHost;
 
   constructor(private ctx: WorkerContext) {}
 
+  private get host(): CodeHost {
+    return (this.code ??= hostFor(this.ctx.dir));
+  }
+
   /**
-   * A worker ran `gh pr create` itself (see ownPr): that pull request is its own from then on, as
+   * A worker opened a pull request itself (see CodeHost.ownPr): that one is its own from then on, as
    * one opened from its desk is. A worker in the main checkout works on a branch the office never
    * made, so this is how the office knows which pull request is whose. For a worker across
    * repositories, one in another of its repositories is kept with that repository.
    */
   noteOwn(w: Worker, command: unknown, output: string) {
-    const pr = ownPr(command, output);
+    const pr = this.host.ownPr(command, output);
     if (!pr) return;
     const { info } = w;
     const same = (repo?: string) => repo?.toLowerCase() === pr.repo.toLowerCase();
@@ -146,7 +117,7 @@ export class WorkerPrs {
    * press, or one opened by hand): that one is used. A worker across repositories gets one in each
    * repository it committed to (see openPrs).
    */
-  async openPr(id: string, by: string, as?: GhAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
+  async openPr(id: string, by: string, as?: HostAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
     const w = this.ctx.workers.get(id);
     if (!w) return 'No such worker';
     const { info } = w;
@@ -168,7 +139,7 @@ export class WorkerPrs {
       const commits = (await run('git', ['log', '--reverse', '--format=%h %s', `${wt.base}..${branch}`], cwd)).split('\n').filter(Boolean);
       const dirty = (await run('git', ['status', '--porcelain'], cwd)) !== '';
       if (!commits.length) return dirty ? `${info.name} hasn't committed anything yet — ask it to commit first` : `${info.name} has no commits on ${branch} yet`;
-      const open = await findOpenPr(branch, cwd);
+      const open = await this.host.findOpenPr(branch, cwd);
       if (open) {
         info.pr = open;
         this.ctx.persist();
@@ -177,7 +148,7 @@ export class WorkerPrs {
       await run('git', ['push', '-u', 'origin', branch], cwd, 90_000, as?.env);
       const base = await this.pushedBranch([wt.from, this.ctx.trees.currentBranch()], branch);
       const { title, body } = draftPr(info, commits, by);
-      const { number, url } = await createPr(branch, base, title, body, cwd, as);
+      const { number, url } = await this.host.createPr(branch, base, title, body, cwd, as);
       info.pr = { number, url };
       this.ctx.persist();
       return { prs: [{ number, url, existed: false, dirty }], failed: [] };
@@ -196,7 +167,7 @@ export class WorkerPrs {
    * description, so they're reviewed and merged together. The issue its task came from is closed by
    * its own floor's pull request; the others only mention it.
    */
-  private async openPrs(w: Worker, by: string, as?: GhAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
+  private async openPrs(w: Worker, by: string, as?: HostAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
     const { info } = w;
     const wt = info.worktree!;
     const home = originRepo(this.ctx.dir);
@@ -216,7 +187,7 @@ export class WorkerPrs {
         const cwd = path.join(this.ctx.dir, p.path);
         try {
           const dirty = (await run('git', ['status', '--porcelain'], cwd)) !== '';
-          const known = p.pr ?? (await findOpenPr(p.branch, cwd));
+          const known = p.pr ?? (await this.host.findOpenPr(p.branch, cwd));
           if (known) {
             p.set(known);
             prs.push({ repo: p.name, ...known, existed: true, dirty, cwd });
@@ -230,7 +201,7 @@ export class WorkerPrs {
           await run('git', ['push', '-u', 'origin', p.branch], cwd, 90_000, as?.env);
           const base = await this.pushedBranch([p.from, new Worktrees(p.dir).currentBranch()], p.branch, p.dir);
           const { title, body } = draftPr(info, commits, by, p.own ? undefined : { home });
-          const pr = await createPr(p.branch, base, title, body, cwd, as);
+          const pr = await this.host.createPr(p.branch, base, title, body, cwd, as);
           p.set(pr);
           this.ctx.persist();
           prs.push({ repo: p.name, ...pr, existed: false, dirty, cwd });
@@ -245,9 +216,9 @@ export class WorkerPrs {
       if (prs.length > 1 && prs.some((p) => !p.existed)) {
         for (const p of prs) {
           try {
-            const body = await gh(['pr', 'view', p.url, '--json', 'body', '--jq', '.body'], p.cwd, 30_000, as?.env);
-            const next = withRelated(body, relatedBlock(prs, p.url, wt.branch));
-            if (next !== body) await gh(['pr', 'edit', p.url, '--body', next], p.cwd, 60_000, as?.env);
+            const body = await this.host.pullBody(p.url, p.cwd, as);
+            const next = withRelated(body, relatedBlock(prs, p.url, wt.branch, this.host));
+            if (next !== body) await this.host.setPullBody(p.url, next, p.cwd, as);
           } catch (err) {
             failed.push(`Couldn't list the other pull requests on ${p.repo} #${p.number}: ${(err as Error).message}`);
           }

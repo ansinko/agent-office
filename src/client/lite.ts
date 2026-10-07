@@ -17,7 +17,7 @@ import { openTerminal, openTerminalFor, routeTerminalMessage } from './ui/termin
 import { openChanges, openChangesFor, routeChangesMessage } from './ui/changes';
 import { lostWorktreeDialog, openPrompt, routeWorktreeMessage, sendHomeDialog } from './ui/prompt';
 import { openBoard } from './ui/boards';
-import type { BoardActions } from './ui/github/prompts';
+import type { BoardActions } from './ui/board-windows/prompts';
 import { openPull, routePullMessage } from './ui/pull';
 import { openQueue } from './ui/queue';
 import { openAsk } from './ui/ask';
@@ -256,12 +256,12 @@ function promptWorker(id: string) {
 }
 
 // ---- New work: a prompt for a worker who's here, or a new one at a free desk -------------------
-function hire(deskId: string, prompt: string, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[], issue?: number) {
+function hire(deskId: string, prompt: string, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[], issue?: string) {
   net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined });
 }
 
-/** With `issue`, the worker the prompt goes to takes that GitHub issue. */
-function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number) {
+/** With `issue` (its key), the worker the prompt goes to takes that issue. */
+function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: string) {
   if (!store.project) return toast('Pick a floor first', 'warn');
   const desk = nextFreeSeat((id) => !!store.workerAtDesk(id))?.id;
   const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));
@@ -323,8 +323,8 @@ $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
 
 function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
-  count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
-  count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
+  count('btn-issues', store.issues.items.filter((i) => i.state === 'open').length);
+  count('btn-pulls', store.pulls.items.filter((p) => p.state === 'open' || p.state === 'draft').length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
 }
 store.on('issues', renderNav);

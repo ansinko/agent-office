@@ -4,13 +4,13 @@
  * and the meeting room's two. What E does at each is defined with it.
  */
 import type * as THREE from 'three';
-import type { GhIssue } from '../../../shared/protocol';
+import type { Issue } from '../../../shared/protocol';
 import type { Ctx } from '../../core/context';
 import { aside, boardHint, hintTitle, key, onE } from '../../core/hint';
 import { store, type Topic } from '../../state';
 import { openBoard } from '../../ui/boards';
-import { inProgress } from '../../ui/github/progress';
-import type { BoardActions } from '../../ui/github/prompts';
+import { inProgress } from '../../ui/board-windows/progress';
+import type { BoardActions } from '../../ui/board-windows/prompts';
 import { clip } from '../../ui/dom';
 import { openIssue } from '../../ui/pull';
 import { openServices } from '../../ui/services';
@@ -31,9 +31,9 @@ declare module '../../world/types' {
 
 export interface BoardsDeps {
   /** The note on the issues board you're pointing at, if any (see aimedNote in input/pointer.ts). */
-  aimedNote(): GhIssue | null;
+  aimedNote(): Issue | null;
   /** Takes an issue's card off the board, into your hands (see features/carrying). */
-  pickUp(it: GhIssue): void;
+  pickUp(it: Issue): void;
   /** What a board's buttons do: hand an issue to a worker, call a meeting about it… */
   boardActions(): BoardActions;
   /** The task queue's window. */
@@ -56,8 +56,8 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
     mat.needsUpdate = true;
   }
   /** Issues whose cards someone on this floor is carrying around, so they're missing from the board. */
-  function offBoard(): Set<number> {
-    const off = new Set<number>();
+  function offBoard(): Set<string> {
+    const off = new Set<string>();
     const carrying = ctx.carrying();
     if (carrying) off.add(carrying.issue);
     for (const p of store.peers.values()) if (p.carrying && p.id !== store.you && store.onMyFloor(p)) off.add(p.carrying.issue);
@@ -67,7 +67,7 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   // The cork holds the issues nobody has started on: one that's in progress comes off it, as a closed one does.
   const renderIssuesBoard = () => {
     const off = offBoard();
-    issuesTex.render({ ...store.issues, items: store.issues.items.filter((i) => !off.has(i.number) && !inProgress(i, store.taskForIssue(i.number))) });
+    issuesTex.render({ ...store.issues, items: store.issues.items.filter((i) => !off.has(i.key) && !inProgress(i, store.taskForIssue(i.key))) });
   };
   // The queue too: a task that starts running takes its issue off the board before GitHub says it's assigned.
   mountBoard(office.boardMeshes.issues, issuesTex.texture, renderIssuesBoard, ['issues', 'queue']);
@@ -104,7 +104,7 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
     reach: 9,
     hint: () => {
       const aimedNote = deps.aimedNote();
-      if (aimedNote) return { k: String(aimedNote.number), parts: [hintTitle(clip(`📌 #${aimedNote.number} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
+      if (aimedNote) return { k: aimedNote.key, parts: [hintTitle(clip(`📌 ${aimedNote.ref} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
       return issuesTex.hasNotes ? { k: 'notes', parts: [hintTitle('📌 Issues board'), key('E', 'Open'), aside('or point at a note to take it')] } : boardHint('📌 Issues board');
     },
     use: (_it, key, note) => {

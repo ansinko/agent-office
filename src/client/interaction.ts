@@ -1,5 +1,5 @@
 import { canLabel } from '../shared/floorplan';
-import type { GhIssue, WorkerInfo } from '../shared/protocol';
+import type { Issue, WorkerInfo } from '../shared/protocol';
 import { isAsleep } from '../shared/status';
 import type { Interactable } from './world/types';
 
@@ -9,7 +9,7 @@ export type DeskKey = (typeof DESK_KEYS)[keyof typeof DESK_KEYS];
 export interface InteractionState {
   worker?: WorkerInfo;
   room: boolean;
-  note: GhIssue | null;
+  note: Issue | null;
   carrying: boolean;
   /** The key besides E that the seat in reach takes, while you sit on it (see SeatUse's extra). */
   seatKey?: DeskKey;

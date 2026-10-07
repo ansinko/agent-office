@@ -2,8 +2,8 @@
 // worktrees and pull requests.
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
-import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
-import { issueNumber, num, str } from '../../office/input.js';
+import { isAgentEffort, isAgentProvider, issueRef, type WorkerClientMsg } from '../../../shared/protocol.js';
+import { issueKey, num, str } from '../../office/input.js';
 import { refusedInRestroom, restroomRefusal } from '../../restroom.js';
 import { here, workerOf } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
@@ -38,10 +38,10 @@ export const workerHandlers = {
     // A shell is theirs too: `claude auth login` or `gh auth login` typed there signs them in.
     const hire = () => {
       const r = floor.workers.spawn(str(msg.deskId, 32), who, str(msg.prompt, 20000) || undefined, msg.worktree === true, kind, msg.provider, model, effort, undefined, c.accountId, repos, msg.via === 'herald' ? 'herald' : undefined);
-      const issue = kind === 'agent' ? issueNumber(msg.issue) : undefined;
+      const issue = kind === 'agent' ? issueKey(msg.issue) : undefined;
       const across = repos.length ? ` across ${[floor.def.name, ...repos.map((x) => x.name)].join(' + ')}` : '';
       if (typeof r === 'string') ctx.warn(c, r);
-      else ctx.toastFloor(floor, kind === 'shell' ? `${who} opened a shell at a desk` : `${who} hired ${r.name}${issue ? ` for issue #${issue}` : r.prompt ? ' with a task' : ''}${across}`);
+      else ctx.toastFloor(floor, kind === 'shell' ? `${who} opened a shell at a desk` : `${who} hired ${r.name}${issue ? ` for issue ${issueRef(issue)}` : r.prompt ? ' with a task' : ''}${across}`);
       if (typeof r !== 'string' && issue) ctx.takeIssue(c, floor, issue);
     };
     // Every project it gets a worktree of starts from what's on GitHub.
@@ -122,9 +122,9 @@ export const workerHandlers = {
     if (w && refusedInRestroom(ctx, c, w.floor, w.info.deskId, 'prompt')) return;
     const err = w ? w.floor.workers.prompt(w.wid, str(msg.prompt, 20000), who) : 'No such worker';
     ctx.warn(c, err);
-    const issue = w?.info.kind === 'agent' ? issueNumber(msg.issue) : undefined;
+    const issue = w?.info.kind === 'agent' ? issueKey(msg.issue) : undefined;
     if (w && !err && issue) {
-      ctx.toastFloor(w.floor, `${who} handed issue #${issue} to ${w.info.name}`);
+      ctx.toastFloor(w.floor, `${who} handed issue ${issueRef(issue)} to ${w.info.name}`);
       ctx.takeIssue(c, w.floor, issue);
     }
   },
@@ -147,7 +147,7 @@ export const workerHandlers = {
     const w = workerOf(ctx, msg.workerId);
     if (!w) return;
     const { floor, wid } = w;
-    ctx.withGitHub(c, (as) => void floor.workers.openPr(wid, who, as).then((r) => {
+    ctx.withHost(c, (as) => void floor.workers.openPr(wid, who, as).then((r) => {
       if (typeof r === 'string') return ctx.warn(c, r);
       const info = floor.workers.get(wid);
       const name = info?.name ?? 'the worker';
@@ -164,10 +164,10 @@ export const workerHandlers = {
       // Put it on the board now rather than at the next poll. A refresh already in flight
       // returns at once and can miss it, so look again shortly after.
       const own = r.prs.find((p) => !p.repo || p.repo === info?.worktree?.path.split(/[\\/]/).pop());
-      void floor.github.refresh().then(() => {
-        if (own && !floor.github.pulls.items.some((p) => p.number === own.number)) setTimeout(() => void floor.github.refresh(), 3000);
+      void floor.refreshBoards().then(() => {
+        if (own && !floor.host.pulls.items.some((p) => p.number === own.number)) setTimeout(() => void floor.refreshBoards(), 3000);
       });
-      for (const x of info?.repos ?? []) void ctx.floors.get(x.floor)?.github.refresh();
+      for (const x of info?.repos ?? []) void ctx.floors.get(x.floor)?.refreshBoards();
     }));
   },
   'term.input'(ctx, c, msg) {

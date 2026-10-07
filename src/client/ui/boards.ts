@@ -1,13 +1,15 @@
 import './boards.css';
-import type { GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol';
+import type { Issue, Label, Pull, WorkerInfo } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
-import { openIssue } from './github/issue-window';
-import { labelChip, openLabels } from './github/labels';
-import { inProgress } from './github/progress';
-import type { BoardActions } from './github/prompts';
-import { openPull } from './github/pull-window';
+import { openIssue } from './board-windows/issue-window';
+import { labelChip, openLabels } from './board-windows/labels';
+import { noteSeed, refText } from './board-windows/notes';
+import { hostName } from './board-windows/pieces';
+import { inProgress } from './board-windows/progress';
+import type { BoardActions } from './board-windows/prompts';
+import { openPull } from './board-windows/pull-window';
 import { providerLabel } from './provider';
 
 const TILTS = ['-1.2deg', '0.8deg', '-0.4deg', '1.4deg', '0deg', '-0.9deg'];
@@ -24,25 +26,25 @@ interface Column<T> {
 
 const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt);
 
-function issueColumns(items: GhIssue[]): Column<GhIssue>[] {
-  const open = items.filter((i) => i.state === 'OPEN');
-  const started = open.filter((i) => inProgress(i, store.taskForIssue(i.number)));
+function issueColumns(items: Issue[]): Column<Issue>[] {
+  const open = items.filter((i) => i.state === 'open');
+  const started = open.filter((i) => inProgress(i, store.taskForIssue(i.key)));
   const todo = open.filter((i) => !started.includes(i));
   return [
     { key: 'open', title: '📥 Open', items: todo },
     { key: 'progress', title: '🚧 In progress', items: started },
-    { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'OPEN').sort(byUpdated), max: 40 },
+    { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'open').sort(byUpdated), max: 40 },
   ];
 }
 
-function pullColumns(items: GhPull[]): Column<GhPull>[] {
-  const open = items.filter((p) => p.state === 'OPEN');
+function pullColumns(items: Pull[]): Column<Pull>[] {
+  const open = items.filter((p) => p.state === 'open');
   return [
-    { key: 'draft', title: '✏️ Draft', items: open.filter((p) => p.isDraft) },
-    { key: 'review', title: '👀 In review', items: open.filter((p) => !p.isDraft && p.reviewDecision !== 'APPROVED') },
-    { key: 'approved', title: '👍 Approved', items: open.filter((p) => !p.isDraft && p.reviewDecision === 'APPROVED') },
-    { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'MERGED').sort(byUpdated), max: 30 },
-    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'CLOSED').sort(byUpdated), max: 20 },
+    { key: 'draft', title: '✏️ Draft', items: items.filter((p) => p.state === 'draft') },
+    { key: 'review', title: '👀 In review', items: open.filter((p) => p.review !== 'approved') },
+    { key: 'approved', title: '👍 Approved', items: open.filter((p) => p.review === 'approved') },
+    { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'merged').sort(byUpdated), max: 30 },
+    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'closed').sort(byUpdated), max: 20 },
   ];
 }
 
@@ -81,11 +83,11 @@ function boardLabels(items: { labels: { name: string; color: string }[] }[]): Ma
   return all;
 }
 
-function labelChips(labels: GhLabel[]) {
+function labelChips(labels: Label[]) {
   return labels.slice(0, 4).map(labelChip);
 }
 
-const CHECK_ICON: Record<GhPull['checks'], string> = { pass: '🟢', fail: '🔴', pending: '🟡', none: '' };
+const CHECK_ICON: Record<Pull['checks'], string> = { pass: '🟢', fail: '🔴', pending: '🟡', none: '' };
 
 /** A chip naming a worker and desk, color-coded to match the worker back on the floor. */
 function workerChip(w: WorkerInfo, title: string) {
@@ -98,7 +100,7 @@ function deskChip(w: WorkerInfo) {
 }
 
 /** Where an issue stands on the 📋 queue, for its card. */
-function queueChip(issue: number): Node | '' {
+function queueChip(issue: string): Node | '' {
   const t = store.taskForIssue(issue);
   if (!t) return '';
   const provider = providerLabel(t.provider, store.project);
@@ -111,7 +113,8 @@ function queueChip(issue: number): Node | '' {
   return t.pr ? h('span.qchip.done', {}, `🔀 PR #${t.pr.number} · ${provider}`) : '';
 }
 
-function card(n: number, title: string, meta: (Node | string)[], i: number, onclick: () => void, onLabels: () => void) {
+function card(it: Issue | Pull, title: string, meta: (Node | string)[], i: number, onclick: () => void, onLabels: () => void) {
+  const n = noteSeed(it);
   return h(
     'li.card',
     {
@@ -120,8 +123,8 @@ function card(n: number, title: string, meta: (Node | string)[], i: number, oncl
       onclick,
       onkeydown: ((e: KeyboardEvent) => e.key === 'Enter' && e.target === e.currentTarget && onclick()) as EventListener,
     },
-    h('button.card-labels', { type: 'button', title: 'Change the labels', 'aria-label': `Change the labels on #${n}`, onclick: ((e: Event) => (e.stopPropagation(), onLabels())) as EventListener }, '🏷️'),
-    h('div.num', {}, `#${n}`),
+    h('button.card-labels', { type: 'button', title: 'Change the labels', 'aria-label': `Change the labels on ${refText(it)}`, onclick: ((e: Event) => (e.stopPropagation(), onLabels())) as EventListener }, '🏷️'),
+    h('div.num', {}, refText(it)),
     h('div.ttl', {}, title),
     h('div.meta', {}, ...meta.filter((m) => m !== '').map((m) => (typeof m === 'string' ? h('span', {}, m) : m))),
   );
@@ -130,7 +133,7 @@ function card(n: number, title: string, meta: (Node | string)[], i: number, oncl
 export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActions) {
   const body = h('div.body');
   const status = h('span.board-status');
-  const refresh = h('button.btn', { title: 'Refresh from GitHub', onclick: () => net.send({ t: 'gh.refresh' }) }, '🔄 Refresh');
+  const refresh = h('button.btn', { title: `Refresh from ${hostName()}`, onclick: () => net.send({ t: 'board.refresh' }) }, '🔄 Refresh');
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, refresh, close), body);
 
@@ -147,7 +150,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
   };
 
   /** Toggles for every label on the board; the column shows cards with any of the ones picked. */
-  const labelPicker = <T extends GhIssue | GhPull>(col: Column<T>, all: Map<string, string>, picked: string[]) => {
+  const labelPicker = <T extends Issue | Pull>(col: Column<T>, all: Map<string, string>, picked: string[]) => {
     const names = [...new Set([...all.keys(), ...picked])].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     const list = h('div.col-labels');
     for (const name of names) {
@@ -168,7 +171,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
   };
 
   /** A column of cards. Type in its box to narrow it by title; click its header to filter it by label. */
-  const column = <T extends GhIssue | GhPull>(col: Column<T>, all: Map<string, string>, cardOf: (it: T, i: number) => HTMLElement) => {
+  const column = <T extends Issue | Pull>(col: Column<T>, all: Map<string, string>, cardOf: (it: T, i: number) => HTMLElement) => {
     const picked = filters[col.key] ?? [];
     const labelled = picked.length ? col.items.filter((it) => it.labels.some((l) => picked.includes(l.name))) : col.items;
     const ul = h('ul');
@@ -251,7 +254,8 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
     const caret = active instanceof HTMLInputElement ? ([active.selectionStart, active.selectionEnd] as const) : null;
     body.replaceChildren();
     if (st.error && !st.items.length) {
-      body.append(h('div.board-error', {}, `Couldn't load from GitHub: ${st.error}`, h('br'), h('small', {}, 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).')));
+      const gh = store.currentFloor()?.host?.kind === 'github';
+      body.append(h('div.board-error', {}, `Couldn't load from ${hostName()}: ${st.error}`, gh ? h('br') : null, gh ? h('small', {}, 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).') : null));
       return;
     }
     const all = boardLabels(st.items);
@@ -259,7 +263,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
       for (const col of issueColumns(store.issues.items)) {
         body.append(
           column(col, all, (it, i) =>
-            card(it.number, it.title, [...labelChips(it.labels), queueChip(it.number), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : it.taken ? '🤖 handed to a worker' : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
+            card(it, it.title, [...labelChips(it.labels), queueChip(it.key), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : it.taken ? '🤖 handed to a worker' : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
           ),
         );
       }
@@ -269,13 +273,13 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
           column(col, all, (it, i) => {
             const w = workerForPull(store.workers.values(), it);
             return card(
-              it.number,
+              it,
               it.title,
               [
                 w ? deskChip(w) : '',
                 ...labelChips(it.labels),
                 `by ${it.author}`,
-                it.reviewDecision === 'CHANGES_REQUESTED' ? '🛠 changes requested' : '',
+                it.review === 'changes' ? '🛠 changes requested' : '',
                 CHECK_ICON[it.checks],
                 h('span', { style: 'color:#2a9d4b' }, `+${it.additions}`),
                 h('span', { style: 'color:#c3423f' }, `-${it.deletions}`),

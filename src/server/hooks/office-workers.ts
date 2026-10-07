@@ -1,10 +1,9 @@
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
-import { gh } from '../github.js';
 import type { Floor } from '../floor.js';
 import { nextFreeSeat } from '../../shared/layout.js';
-import type { WorkerInfo } from '../../shared/protocol.js';
+import { issueRef, type PullState, type WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
@@ -17,18 +16,18 @@ import { workerRestroomRefusal } from '../restroom.js';
 async function pullOf(floor: Floor, n: number, repo?: string): Promise<{ number: number; url: string } | string> {
   const here = floor.def.repo;
   if (repo && here && repo.toLowerCase() !== here.toLowerCase()) return `That pull request is in ${repo}, and this floor is ${here}`;
-  const listed = floor.github.pulls.items.find((p) => p.number === n);
-  let pr: { url: string; state: string } | undefined = listed;
+  const listed = floor.host.pulls.items.find((p) => p.number === n);
+  let pr: { url: string; state: PullState } | undefined = listed;
   if (!pr) {
     try {
-      pr = JSON.parse(await gh(['pr', 'view', String(n), '--json', 'url,state'], floor.dir)) as { url: string; state: string };
+      pr = await floor.host.findPull(n);
     } catch (err) {
       return `No pull request #${n} here: ${(err as Error).message}`;
     }
   }
-  if (pr.state === 'CLOSED') return `PR #${n} was closed without merging`;
+  if (pr.state === 'closed') return `PR #${n} was closed without merging`;
   // The office follows the open ones and the last ones merged: an older one would look open for good.
-  if (!listed && pr.state === 'MERGED') return `PR #${n} merged too long ago for the office to follow: send the worker home by name instead`;
+  if (!listed && pr.state === 'merged') return `PR #${n} merged too long ago for the office to follow: send the worker home by name instead`;
   return { number: n, url: pr.url };
 }
 
@@ -46,7 +45,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   const me = floor?.workers.authenticate(workerId, token);
   if (!floor || !me) return send(res, 401, { error: 'Send your own AGENT_OFFICE_WORKER_ID as ?worker= and AGENT_OFFICE_HOOK_TOKEN as the bearer token' });
   const who = me.name;
-  const view: PullsView = { pulls: floor.github.pulls.items, tasks: floor.queue.state().tasks, pullsOf: (id) => ctx.floors.get(id)?.github.pulls.items };
+  const view: PullsView = { pulls: floor.host.pulls.items, tasks: floor.queue.state().tasks, pullsOf: (id) => ctx.floors.get(id)?.host.pulls.items };
   const row = (id: string) => {
     const w = floor.workers.get(id);
     return w && workerRow(w, view, me.id);
@@ -135,7 +134,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   }
 
   if (action === '/pr') {
-    const ask = readPrRequest(body);
+    const ask = readPrRequest(body, floor.host);
     if (typeof ask === 'string') return send(res, 400, { error: ask });
     const w = ask.worker ? findWorker(floor.workers.list(), ask.worker) : me;
     if (typeof w === 'string') return send(res, 404, { error: w });
@@ -163,13 +162,13 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   const owner = floor.workers.ownerOf(me.id);
   const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner);
   if (typeof r === 'string') return send(res, 400, { error: r });
-  ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue #${ask.issue}` : ' with a task'}`);
+  ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue ${issueRef(ask.issue)}` : ' with a task'}`);
   if (ask.issue) {
     const n = ask.issue;
     floor.queue.dropIssue(n);
     const as = owner ? ctx.signins.ghAs(owner) : undefined;
-    if (typeof as === 'string') ctx.toastFloor(floor, `Couldn't assign issue #${n} on GitHub: ${as}`, 'warn');
-    else void floor.github.claim(n, as).then((e) => e && ctx.toastFloor(floor, `Couldn't assign issue #${n} on GitHub: ${e}`, 'warn'));
+    if (typeof as === 'string') ctx.toastFloor(floor, `Couldn't assign issue ${issueRef(n)} on GitHub: ${as}`, 'warn');
+    else void floor.tracker.claim(n, as).then((e) => e && ctx.toastFloor(floor, `Couldn't assign issue ${issueRef(n)} on GitHub: ${e}`, 'warn'));
   }
   send(res, 200, { ok: true, worker: row(r.id) });
 }

@@ -8,7 +8,7 @@ import type { AccountsClientMsg, AccountsServerMsg, SignInsClientMsg, TeamClient
 import type { AppScreenClientMsg, AppScreenServerMsg } from './protocol/appscreen.js';
 import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
-import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
+import type { BoardClientMsg, BoardServerMsg } from './protocol/boards.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
@@ -23,7 +23,7 @@ export * from './protocol/agents.js';
 export * from './protocol/appscreen.js';
 export * from './protocol/changes.js';
 export * from './protocol/floors.js';
-export * from './protocol/github.js';
+export * from './protocol/boards.js';
 export * from './protocol/meetings.js';
 export * from './protocol/presence.js';
 export * from './protocol/queue.js';
@@ -37,7 +37,7 @@ export type ClientMsg =
   | PresenceClientMsg
   | RooftopClientMsg
   | WorkerClientMsg
-  | GitHubClientMsg
+  | BoardClientMsg
   | QueueClientMsg
   | MeetingClientMsg
   | FloorClientMsg
@@ -62,7 +62,7 @@ export type ServerMsg =
   | PresenceServerMsg
   | RooftopServerMsg
   | WorkerServerMsg
-  | GitHubServerMsg
+  | BoardServerMsg
   | QueueServerMsg
   | MeetingServerMsg
   | FloorServerMsg

@@ -9,9 +9,9 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { TOOLS, UsageError, buildRequest, formatHome, formatLinked, formatWorkers, handleMcp, main, parseArgs } from '../bin/office-workers.js';
 import { codexMcpArgs, findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow } from '../src/server/office-workers.js';
-import { ownPr } from '../src/server/workers/pr.js';
+import { HOSTS } from '../src/server/hosts/registry.js';
 import { notLeaving } from '../src/server/leave-on-merge.js';
-import type { GhPull, WorkerInfo } from '../src/shared/protocol.js';
+import type { Pull, WorkerInfo } from '../src/shared/protocol.js';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'office-workers.js');
 const ENV = { AGENT_OFFICE_HOOK_URL: 'http://127.0.0.1:4455/', AGENT_OFFICE_WORKER_ID: 'w1', AGENT_OFFICE_HOOK_TOKEN: 'tok' };
@@ -25,8 +25,8 @@ function worker(id: string, more: Partial<WorkerInfo> = {}): WorkerInfo {
   };
 }
 
-const pull = (number: number, state: string, headRefName: string, headRefOid?: string): GhPull => ({
-  number, title: `PR ${number}`, state, isDraft: false, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], reviewDecision: '',
+const pull = (number: number, state: Pull['state'], headRefName: string, headRefOid?: string): Pull => ({
+  number, title: `PR ${number}`, state, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0, checks: 'none', body: '', closes: [],
 });
 
@@ -211,7 +211,7 @@ test('office-workers mcp serves a real client over stdio, as the worker', async 
 
 test("a worker's row says where its pull request stands, and whether it would go home by itself", () => {
   const head = 'a'.repeat(40);
-  const view = { pulls: [pull(7, 'MERGED', 'office/bolt', head), pull(8, 'OPEN', 'office/zed')], tasks: [] };
+  const view = { pulls: [pull(7, 'merged', 'office/bolt', head), pull(8, 'open', 'office/zed')], tasks: [] };
   const bolt = workerRow(worker('bolt', { task: { name: 'Login fix', summary: 'Fixed the redirect' } }), view, 'mochi');
   assert.deepEqual(bolt, {
     id: 'bolt', name: 'Bolt', kind: 'agent', desk: 'Desk 1', status: 'done', task: 'Login fix: Fixed the redirect', hiredBy: 'Ada', hiredAt: '1970-01-01T00:00:00.000Z',
@@ -230,7 +230,7 @@ test("a worker's row says where its pull request stands, and whether it would go
 });
 
 test('a worker in the main checkout has the pull request it opened itself', () => {
-  const view = { pulls: [pull(7, 'MERGED', 'fix-login', 'a'.repeat(40)), pull(8, 'OPEN', 'fix-logout')], tasks: [] };
+  const view = { pulls: [pull(7, 'merged', 'fix-login', 'a'.repeat(40)), pull(8, 'open', 'fix-logout')], tasks: [] };
   // Its branch is one the office never made: with nothing saying whose #7 is, it has no pull request.
   const pixel = worker('pixel', { worktree: undefined });
   assert.equal(workerRow(pixel, view).pr, undefined);
@@ -244,6 +244,8 @@ test('a worker in the main checkout has the pull request it opened itself', () =
   assert.deepEqual([both.pr?.number, both.pr?.state, both.merged], [8, 'open', false]);
 
   // What `gh pr create` printed, alone or at the end of a longer line; the one its branch already had counts too.
+  const github = HOSTS.github!.pulls('/tmp', () => {});
+  const ownPr = (command: unknown, output: string) => github.ownPr(command, output);
   const url = 'https://github.com/acme/app/pull/12';
   assert.deepEqual(ownPr('gh pr create --title "Fix it" --body "Closes #4"', `${url}\n`), { repo: 'acme/app', number: 12, url });
   assert.deepEqual(ownPr('cd ../wt && git push -u origin fix-it 2>&1 | tail -1; gh pr create --fill', `remote: https://github.com/acme/app/pull/new/fix-it\n${url}`), { repo: 'acme/app', number: 12, url });
@@ -256,16 +258,17 @@ test('a worker in the main checkout has the pull request it opened itself', () =
 });
 
 test('reads a request to say which pull request is whose', () => {
-  assert.deepEqual(readPrRequest({ pr: 12 }), { pr: 12 });
-  assert.deepEqual(readPrRequest({ pr: ' #12 ', worker: ' Bolt ' }), { worker: 'Bolt', pr: 12 });
-  assert.deepEqual(readPrRequest({ pr: 'https://github.com/acme/app/pull/12/files', worker: 'Bolt' }), { worker: 'Bolt', pr: 12, repo: 'acme/app' });
-  assert.deepEqual(readPrRequest({ unlink: true, worker: 'Bolt' }), { worker: 'Bolt' });
-  assert.deepEqual(readPrRequest({ unlink: true }), {});
-  assert.match(readPrRequest({}) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 0 }) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 'https://github.com/acme/app/issues/12' }) as string, /Say which pull request/);
-  assert.match(readPrRequest({ pr: 12, unlink: true }) as string, /not both/);
-  assert.match(readPrRequest({ pr: 12, worker: 7 }) as string, /worker is a worker name or id/);
+  const github = HOSTS.github!.pulls('/tmp', () => {});
+  assert.deepEqual(readPrRequest({ pr: 12 }, github), { pr: 12 });
+  assert.deepEqual(readPrRequest({ pr: ' #12 ', worker: ' Bolt ' }, github), { worker: 'Bolt', pr: 12 });
+  assert.deepEqual(readPrRequest({ pr: 'https://github.com/acme/app/pull/12/files', worker: 'Bolt' }, github), { worker: 'Bolt', pr: 12, repo: 'acme/app' });
+  assert.deepEqual(readPrRequest({ unlink: true, worker: 'Bolt' }, github), { worker: 'Bolt' });
+  assert.deepEqual(readPrRequest({ unlink: true }, github), {});
+  assert.match(readPrRequest({}, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 0 }, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 'https://github.com/acme/app/issues/12' }, github) as string, /Say which pull request/);
+  assert.match(readPrRequest({ pr: 12, unlink: true }, github) as string, /not both/);
+  assert.match(readPrRequest({ pr: 12, worker: 7 }, github) as string, /worker is a worker name or id/);
 });
 
 test('finds a worker by id or name, and says who there is when it cannot', () => {
@@ -289,8 +292,9 @@ test('reads send-home and hire requests', () => {
 
   const providers = ['claude', 'codex'] as const;
   assert.deepEqual(readHireRequest({ prompt: ' Fix it\r\n', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: 4 }, [...providers]), {
-    prompt: 'Fix it', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: 4,
+    prompt: 'Fix it', provider: 'codex', effort: 'high', worktree: false, desk: 'desk-3', issue: '4',
   });
+  assert.equal((readHireRequest({ prompt: 'x', issue: 'ERN-7' }, [...providers]) as { issue?: string }).issue, 'ERN-7');
   assert.match(readHireRequest({}, [...providers]) as string, /prompt/);
   assert.match(readHireRequest({ prompt: 'x', provider: 'grok' }, [...providers]) as string, /provider is one of claude, codex/);
   assert.match(readHireRequest({ prompt: 'x', desk: 'station-queue' }, [...providers]) as string, /desk/);

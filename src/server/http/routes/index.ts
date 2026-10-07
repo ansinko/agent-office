@@ -5,8 +5,8 @@ import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
 import { appScreenRoutes } from './appscreen.js';
 import { authRoutes } from './auth.js';
+import { boardRoutes } from './boards.js';
 import { fileRoutes } from './files.js';
-import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
@@ -40,7 +40,7 @@ export const routes: readonly Route[] = [
   appScreenRoutes.shot,
   searchRoutes.search,
   serviceRoutes.forwards,
-  githubRoutes.github,
+  boardRoutes.windows,
   pageRoutes.office,
   pageRoutes.lite,
   pageRoutes.bundle,

@@ -67,7 +67,7 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
       reviews.push({ pr, file });
       return `https://github.com/o/r/pull/${pr}#pullrequestreview-1`;
     },
-    prompt: (id) => opts.rewritten?.[id] ?? PROMPTS[id].text,
+    prompts: { text: (id) => opts.rewritten?.[id] ?? PROMPTS[id].text, agent: () => undefined },
   });
   const cwd = () => {
     const wt = room.state().current?.worktree;
@@ -207,6 +207,9 @@ test('a review panel posts the combined review on the pull request', async (t) =
   assert.equal(m.output, 'reviews/pr-42.md');
   assert.equal(m.title, 'Review of PR #42');
   assert.match(f.prompts[1].text, /through your lens, Security/);
+  // With GitHub, the brief and the part quote gh as they always did.
+  assert.ok(f.prompts[1].text.includes('The pull request is #42: read it with gh pr view 42 and gh pr diff 42.'));
+  assert.ok(f.prompts[1].text.includes("Read it with gh pr view 42 and gh pr diff 42; don't check it out"));
   for (const i of [0, 1, 2]) f.take(i, '- a.ts:1 — something');
   assert.match(f.prompts.at(-1)!.text, /\*\*\[Security\]\*\*/);
   f.take(0, 'Looks fine. **[Security]** a.ts:1 — something');
@@ -215,6 +218,12 @@ test('a review panel posts the combined review on the pull request', async (t) =
   assert.equal(m.status, 'done');
   assert.deepEqual(f.reviews, [{ pr: 42, file: path.join(f.dir, 'reviews/pr-42.md') }]);
   assert.equal(m.review?.url, 'https://github.com/o/r/pull/42#pullrequestreview-1');
+});
+
+test('a meeting about an issue tells everyone how to read it', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  assert.equal(f.start({ issue: '7' }), undefined);
+  assert.ok(f.prompts[0].text.includes('It comes from GitHub issue #7: gh issue view 7 --comments.'));
 });
 
 test('map-reduce hands each mapper its own parts', (t) => {

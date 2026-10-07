@@ -1,5 +1,5 @@
 import './pulldiff.css';
-import type { GhReviewComment } from '../../../shared/protocol';
+import type { ReviewComment } from '../../../shared/protocol';
 import { h, timeAgo } from '../dom';
 import { markdown } from '../markdown';
 
@@ -156,7 +156,7 @@ export function looksGenerated(path: string): boolean {
 }
 
 /** A line comment and its replies. */
-export function renderThread(root: GhReviewComment, replies: Map<number, GhReviewComment[]>, itemUrl: string): HTMLElement {
+export function renderThread(root: ReviewComment, replies: Map<number, ReviewComment[]>, itemUrl: string): HTMLElement {
   const all = [root, ...(replies.get(root.id) ?? [])];
   return h(
     'div.pd-thread',
@@ -173,8 +173,8 @@ export function renderThread(root: GhReviewComment, replies: Map<number, GhRevie
 }
 
 /** Line comments on this file that are still on a line, keyed "RIGHT:12" / "LEFT:7". */
-export function threadsByLine(comments: GhReviewComment[], path: string): Map<string, GhReviewComment[]> {
-  const out = new Map<string, GhReviewComment[]>();
+export function threadsByLine(comments: ReviewComment[], path: string): Map<string, ReviewComment[]> {
+  const out = new Map<string, ReviewComment[]>();
   for (const c of comments) {
     if (c.replyTo || c.path !== path || c.line == null) continue;
     const k = `${c.side}:${c.line}`;
@@ -183,14 +183,14 @@ export function threadsByLine(comments: GhReviewComment[], path: string): Map<st
   return out;
 }
 
-export function repliesOf(comments: GhReviewComment[]): Map<number, GhReviewComment[]> {
-  const out = new Map<number, GhReviewComment[]>();
+export function repliesOf(comments: ReviewComment[]): Map<number, ReviewComment[]> {
+  const out = new Map<number, ReviewComment[]>();
   for (const c of comments) if (c.replyTo) out.set(c.replyTo, [...(out.get(c.replyTo) ?? []), c]);
   return out;
 }
 
 /** The lines of one file's diff, with its line comments under the lines they're on. */
-export function renderFileDiff(f: DiffFile, comments: GhReviewComment[], itemUrl: string): HTMLElement {
+export function renderFileDiff(f: DiffFile, comments: ReviewComment[], itemUrl: string): HTMLElement {
   const out = h('div.pd-lines');
   if (f.binary) {
     out.append(h('div.pd-note', {}, 'Binary file — not shown.'));

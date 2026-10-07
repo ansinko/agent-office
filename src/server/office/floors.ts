@@ -17,7 +17,7 @@ export function floorHelpers(ctx: Ctx): FloorHelpers {
   };
   const floorInfos = (): FloorInfo[] => [
     ...[...ctx.floors.values()].map((f) => ({ ...f.info(), ...(ctx.building.isLocal(f.id) ? { local: true } : {}) })),
-    ...ctx.building.pending().map((d) => ({ id: d.id, name: d.name, repo: d.repo, dir: d.dir, palette: d.palette, addedBy: d.addedBy, addedAt: d.addedAt, cloning: true, clone: ctx.building.cloneProgress(d.id), workers: 0, busy: 0, waiting: 0, people: 0 })),
+    ...ctx.building.pending().map((d) => ({ id: d.id, name: d.name, repo: d.repo, host: null, tracker: null, dir: d.dir, palette: d.palette, addedBy: d.addedBy, addedAt: d.addedAt, cloning: true, clone: ctx.building.cloneProgress(d.id), workers: 0, busy: 0, waiting: 0, people: 0 })),
   ];
   // The elevator's counts change with every worker update; tell everyone at most a few times a second.
   let floorsSent = '';
@@ -118,7 +118,7 @@ export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen
     lent: (floor) => [...floors.values()].some((f) => f !== floor && worksIn(f, floor)),
     locksUp: () => !!ctx.maps.plan().sendHome?.keeps,
     runAs: ctx.signins,
-    ghAs: (owner) => (owner ? ctx.signins.ghAs(owner) : undefined),
+    hostAs: (owner) => (owner ? ctx.signins.ghAs(owner) : undefined),
   };
   /** Whether a worker on `from` works in `on`'s project too (see WorkerInfo.repos). */
   const worksIn = (from: Floor, on: Floor) => from.workers.list().some((w) => w.repos?.some((r) => r.floor === on.id));

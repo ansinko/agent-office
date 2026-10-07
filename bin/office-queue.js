@@ -40,7 +40,7 @@ export function parseArgs(argv) {
     return { cmd: 'remove', id: rest[0] };
   }
   if (cmd !== 'add') throw new UsageError(`Unknown command: ${cmd}`);
-  /** @type {{ cmd: 'add', title?: string, issue?: number, prompt?: string }} */
+  /** @type {{ cmd: 'add', title?: string, issue?: string, prompt?: string }} */
   const out = { cmd: 'add' };
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
@@ -56,9 +56,9 @@ export function parseArgs(argv) {
     if (flag === '--title') out.title = value.trim();
     else if (flag === '--prompt') out.prompt = value;
     else {
-      const n = /^#?(\d+)$/.exec(value.trim());
-      if (!n || Number(n[1]) < 1) throw new UsageError(`--issue takes an issue number, e.g. --issue 12 (got ${value})`);
-      out.issue = Number(n[1]);
+      const key = value.trim().replace(/^#/, '');
+      if (!/^(?:[1-9]\d{0,9}|[A-Z][A-Z0-9_]{0,19}-[1-9]\d{0,9})$/.test(key)) throw new UsageError(`--issue takes an issue number or key, e.g. --issue 12 or --issue ABC-12 (got ${value})`);
+      out.issue = key;
     }
   }
   if (!out.title) throw new UsageError('Give the task a --title, e.g. office-queue add --title "Fix the login redirect"');
@@ -106,6 +106,9 @@ export function buildRequest(cmd, office, prompt) {
   return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
+/** #12 for a GitHub issue number, the key itself for a tracker's (ABC-12). */
+const issueRef = (key) => (/^\d+$/.test(String(key)) ? `#${key}` : String(key));
+
 /**
  * The queue as the office returns it, one line per task.
  * @param {{ maxWorkers?: number, tasks?: Array<Record<string, any>> }} view
@@ -118,7 +121,7 @@ export function formatQueue(view) {
   const status = (t) => (t.status === 'done' && t.outcome && t.outcome !== 'done' ? `done (${t.outcome})` : String(t.status ?? '?'));
   const width = Math.max(...tasks.map((t) => status(t).length));
   for (const t of tasks) {
-    const parts = [`${t.title ?? ''}${t.issue ? ` (issue #${t.issue})` : ''}`];
+    const parts = [`${t.title ?? ''}${t.issue ? ` (issue ${issueRef(t.issue)})` : ''}`];
     if (t.worker) parts.push(`worker ${t.worker}${t.branch ? ` on ${t.branch}` : ''}`);
     if (t.pr) parts.push(`PR #${t.pr.number}${t.pr.state ? ` ${String(t.pr.state).toLowerCase()}` : ''} ${t.pr.url}`);
     if (t.error) parts.push(`error: ${t.error}`);
@@ -204,7 +207,7 @@ export async function main(argv, io = {}) {
     else {
       const task = res.body?.task ?? {};
       out(task.id ?? '');
-      err(`Queued “${task.title ?? cmd.title}” (${task.status ?? 'queued'}${cmd.issue !== undefined ? `, issue #${cmd.issue}` : ''}).`);
+      err(`Queued “${task.title ?? cmd.title}” (${task.status ?? 'queued'}${cmd.issue !== undefined ? `, issue ${issueRef(cmd.issue)}` : ''}).`);
     }
     return 0;
   } catch (e) {

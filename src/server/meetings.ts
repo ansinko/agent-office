@@ -5,11 +5,11 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { MEETING_SEATS } from '../shared/layout.js';
 import { MEETING_NOTES_DIR, MEETING_PATTERNS, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
-import { isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
+import { isAgentEffort, isAgentProvider, issueKey, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
-import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
+import { hostText, officePrompt, type PromptId, type PromptSource, type PromptVars } from './prompts.js';
 
 const execFileP = promisify(execFile);
 
@@ -42,8 +42,8 @@ export interface MeetingEvents {
   hiringPaused(): string | undefined;
   /** Posts the review panel's review on its pull request. Resolves to the review's URL. */
   postReview(pr: number, file: string, owner?: string): Promise<string>;
-  /** One of the office's prompts as it has it now (rewritten in ⚙️ Settings, or the default). */
-  prompt?(id: PromptId): string;
+  /** The office's prompts as it has them now (rewritten in ⚙️ Settings, or the defaults), quoting the floor's host. */
+  prompts?: PromptSource;
 }
 
 const PUMP_MS = 3000;
@@ -145,7 +145,7 @@ export class MeetingRoom {
     if (pattern.needs === 'pr' && pr === undefined) return 'A review panel needs a pull request to review';
     const parts = (Array.isArray(req.parts) ? req.parts : []).map((p) => String(p ?? '').trim()).filter(Boolean).slice(0, PARTS_MAX);
     if (pattern.needs === 'parts' && parts.length < count - 1) return `List at least ${count - 1} part${count === 2 ? '' : 's'} for the mappers, one per line (or seat fewer workers)`;
-    const issue = Number.isInteger(req.issue) && (req.issue as number) > 0 ? (req.issue as number) : undefined;
+    const issue = issueKey(req.issue);
     const rounds = clamp(Math.floor(Number(req.rounds) || pattern.rounds.default), pattern.rounds.min, pattern.rounds.max);
     const title = (String(req.title ?? '').replace(/\s+/g, ' ').trim() || (pr !== undefined && req.pattern === 'review' ? `Review of PR #${pr}` : firstLine(prompt))).slice(0, 100);
     const id = randomBytes(4).toString('hex');
@@ -533,8 +533,8 @@ export class MeetingRoom {
       others: list(others),
       how: how[m.pattern],
       about: m.prompt,
-      pullRequest: m.pr !== undefined ? `The pull request is #${m.pr}: read it with gh pr view ${m.pr} and gh pr diff ${m.pr}.` : '',
-      issue: m.issue !== undefined ? `It comes from GitHub issue #${m.issue}: gh issue view ${m.issue} --comments.` : '',
+      pullRequest: m.pr !== undefined ? hostText(this.events.prompts, 'The pull request is #{{number}}: read it with {{viewPull}} and {{diffPull}}.', { number: m.pr }) : '',
+      issue: m.issue !== undefined ? hostText(this.events.prompts, 'It comes from {{host}} issue #{{number}}: {{viewIssue}}.', { number: m.issue }) : '',
       cwd: this.cwd(m),
       notes: path.join(this.cwd(m), m.notes),
       output: m.output,
@@ -546,7 +546,7 @@ export class MeetingRoom {
 
   /** One of the office's prompts, filled in. */
   private say(id: PromptId, vars: PromptVars = {}): string {
-    return fillPrompt(this.events.prompt?.(id) ?? PROMPTS[id].text, vars);
+    return officePrompt(this.events.prompts, id, vars);
   }
 
   /** A part, as the prompt that hands it over. */
@@ -624,7 +624,7 @@ export class MeetingRoom {
             seat: i,
             doing: 'reviewing',
             file: note(1, i),
-            ask: this.say('meeting.review.review', { pr: m.pr, role: m.seats[i].role, file: A(note(1, i)) }),
+            ask: this.say('meeting.review.review', { pr: m.pr, number: m.pr, role: m.seats[i].role, file: A(note(1, i)) }),
           }));
         }
         return [{ seat: 0, doing: 'writing the review', file: m.output, ask: this.say('meeting.review.combine', { findings: notes(1, all), exampleRole: m.seats[1]?.role ?? 'Security', output: A(m.output) }) }];

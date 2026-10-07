@@ -6,7 +6,7 @@ import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from
 import { DESK_BY_ID, STATION_AGENT } from '../../shared/layout.js';
 import { stationBrief } from '../stations.js';
 import type { PromptSource } from '../prompts.js';
-import type { GhAs } from '../signins.js';
+import type { HostAs } from '../hosts/types.js';
 import type { ServiceOwner } from '../services.js';
 import { addUsage, newTracker, scanTracker, trackerUsage, zeroUsage, type Ledger } from '../usage.js';
 import { PtyHost, SCROLLBACK, type Adopted, type Pty } from '../ptys.js';
@@ -523,7 +523,7 @@ export class WorkerManager {
   }
 
   /** Pushes a worktree worker's branch and opens a pull request for it, as `as` or else the office (see WorkerPrs.openPr). */
-  openPr(id: string, by: string, as?: GhAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
+  openPr(id: string, by: string, as?: HostAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
     return this.prs.openPr(id, by, as);
   }
 

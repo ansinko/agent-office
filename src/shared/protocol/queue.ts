@@ -1,6 +1,7 @@
 // The floor's task queue.
 
 import type { AgentEffort, AgentProvider } from './agents.js';
+import type { PullState } from './boards.js';
 
 export type TaskStatus = 'queued' | 'running' | 'done';
 
@@ -12,8 +13,8 @@ export interface QueueTask {
   model?: string;
   /** Reasoning effort requested for this task, when one was chosen (Claude only). */
   effort?: AgentEffort;
-  /** The GitHub issue it came from, when it did. */
-  issue?: number;
+  /** The key of the issue it came from, when it did. */
+  issue?: string;
   title: string;
   prompt: string;
   addedBy: string;
@@ -32,7 +33,7 @@ export interface QueueTask {
   outcome?: 'done' | 'exited' | 'killed' | 'failed';
   error?: string;
   /** The pull request that closes the issue, or was opened from the worker's branch. */
-  pr?: { number: number; url: string; state: string; title: string };
+  pr?: { number: number; url: string; state: PullState; title: string };
 }
 
 export interface QueueState {
@@ -42,7 +43,7 @@ export interface QueueState {
 }
 
 export type QueueClientMsg =
-  | { t: 'queue.add'; prompt: string; title?: string; issue?: number; provider?: AgentProvider; model?: string; effort?: AgentEffort }
+  | { t: 'queue.add'; prompt: string; title?: string; issue?: string; provider?: AgentProvider; model?: string; effort?: AgentEffort }
   | { t: 'queue.remove'; taskId: string }
   /** Move a queued task up (-1) or down (+1) the queue. */
   | { t: 'queue.move'; taskId: string; delta: number }

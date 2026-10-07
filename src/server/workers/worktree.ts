@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { WorkerInfo, WorkerRepo } from '../../shared/protocol.js';
-import { normalizeRepo } from '../../shared/floors.js';
+import { parseRemote } from '../../shared/hosts.js';
 import { officePrompt } from '../prompts.js';
 import { WORKSPACE_FILES, WORKTREES_DIR, Worktrees, describeWork, workspaceOf, type WorktreeCleanup, type WorktreeRef, type WorktreeState } from '../worktrees.js';
 import { midTurn } from './lifecycle.js';
@@ -50,10 +50,10 @@ export function validRepos(raw: unknown): WorkerRepo[] | undefined {
   return repos.length ? repos : undefined;
 }
 
-/** owner/name of a checkout's origin on GitHub, when it has one. */
+/** owner/name of a checkout's origin on a host the office knows, when it has one. */
 export function originRepo(dir: string): string | undefined {
   try {
-    return normalizeRepo(execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim());
+    return parseRemote(execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trim())?.repo;
   } catch {
     return undefined;
   }

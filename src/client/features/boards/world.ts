@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import type { GhIssue, GhPull, GhState, QueueState, QueueTask, ServiceInfo, WorkerInfo } from '../../../shared/protocol';
+import type { Issue, Pull, BoardState, QueueState, QueueTask, ServiceInfo, WorkerInfo } from '../../../shared/protocol';
 import { store, workerForPull } from '../../state';
+import { noteKey, noteSeed, refText } from '../../ui/board-windows/notes';
 
 export const NOTE_COLORS = ['#fff7b0', '#ffd6e0', '#caffbf', '#bde0fe', '#ffe5b4'];
 export const PINS = ['#ef476f', '#118ab2', '#06d6a0', '#ffd166'];
@@ -24,7 +25,7 @@ export function wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number, 
 
 /** A note as it was last drawn: its middle, size and tilt on the canvas. */
 interface DrawnNote {
-  number: number;
+  key: string;
   x: number;
   y: number;
   w: number;
@@ -39,8 +40,8 @@ export class BoardTexture {
   private ctx: CanvasRenderingContext2D;
   private notes: DrawnNote[] = [];
   /** The note being reached for, drawn lifted off the cork (see lift). */
-  private lifted: number | null = null;
-  private last: [GhState<GhIssue> | GhState<GhPull>, Map<string, WorkerInfo> | undefined] | null = null;
+  private lifted: string | null = null;
+  private last: [BoardState<Issue> | BoardState<Pull>, Map<string, WorkerInfo> | undefined] | null = null;
 
   constructor(private kind: 'issues' | 'pulls') {
     this.canvas.width = 1200;
@@ -57,7 +58,7 @@ export class BoardTexture {
   }
 
   /** The note at a point on the board's face (its uv), or undefined over bare cork. */
-  noteAt(uv: THREE.Vector2): number | undefined {
+  noteAt(uv: THREE.Vector2): string | undefined {
     const px = uv.x * this.canvas.width;
     const py = (1 - uv.y) * this.canvas.height;
     // Topmost first: later notes are drawn over earlier ones.
@@ -68,20 +69,20 @@ export class BoardTexture {
       const dy = py - n.y;
       const c = Math.cos(-n.tilt);
       const s = Math.sin(-n.tilt);
-      if (Math.abs(dx * c - dy * s) <= n.w / 2 && Math.abs(dx * s + dy * c) <= n.h / 2) return n.number;
+      if (Math.abs(dx * c - dy * s) <= n.w / 2 && Math.abs(dx * s + dy * c) <= n.h / 2) return n.key;
     }
     return undefined;
   }
 
   /** Draws one note lifted off the cork, the one you're about to take (null for none). */
-  lift(number: number | null) {
-    if (number === this.lifted) return;
-    this.lifted = number;
+  lift(key: string | null) {
+    if (key === this.lifted) return;
+    this.lifted = key;
     if (this.last) this.render(...this.last);
   }
 
   /** `workers` lets PR notes name the desk they came from. */
-  render(state: GhState<GhIssue> | GhState<GhPull>, workers?: Map<string, WorkerInfo>) {
+  render(state: BoardState<Issue> | BoardState<Pull>, workers?: Map<string, WorkerInfo>) {
     this.last = [state, workers];
     this.notes = [];
     const g = this.ctx;
@@ -96,7 +97,7 @@ export class BoardTexture {
       g.fillStyle = rnd() > 0.5 ? 'rgba(120,70,30,.18)' : 'rgba(255,240,210,.18)';
       g.fillRect(rnd() * W, rnd() * H, 3, 3);
     }
-    const open = (state.items as (GhIssue | GhPull)[]).filter((i) => i.state === 'OPEN');
+    const open = (state.items as (Issue | Pull)[]).filter((i) => i.state === 'open' || i.state === 'draft');
     if (!open.length) {
       const note = state.error ? `⚠️ ${state.error}` : state.loading && !state.fetchedAt ? 'Loading…' : this.kind === 'issues' ? 'No open issues 🎉' : 'No open PRs';
       g.font = '800 40px Nunito, ui-rounded, system-ui, sans-serif';
@@ -127,9 +128,10 @@ export class BoardTexture {
       const r = Math.floor(i / cols);
       const x = gx + c * (nw + gx);
       const y = gy + r * (nh + gy);
-      const tilt = ((it.number * 37) % 7 - 3) * 0.012;
-      this.notes.push({ number: it.number, x: x + nw / 2, y: y + nh / 2, w: nw, h: nh, tilt });
-      const lifted = it.number === this.lifted;
+      const seed = noteSeed(it);
+      const tilt = ((seed * 37) % 7 - 3) * 0.012;
+      this.notes.push({ key: noteKey(it), x: x + nw / 2, y: y + nh / 2, w: nw, h: nh, tilt });
+      const lifted = noteKey(it) === this.lifted;
       g.save();
       g.translate(x + nw / 2, y + nh / 2);
       g.rotate(tilt);
@@ -137,8 +139,8 @@ export class BoardTexture {
       if (lifted) g.scale(1.06, 1.06);
       g.fillStyle = lifted ? 'rgba(0,0,0,.32)' : 'rgba(0,0,0,.25)';
       g.fillRect(-nw / 2 + (lifted ? 12 : 5), -nh / 2 + (lifted ? 16 : 7), nw, nh);
-      const draft = this.kind === 'pulls' && (it as GhPull).isDraft;
-      g.fillStyle = draft ? '#e9ecef' : NOTE_COLORS[it.number % NOTE_COLORS.length];
+      const draft = it.state === 'draft';
+      g.fillStyle = draft ? '#e9ecef' : NOTE_COLORS[seed % NOTE_COLORS.length];
       g.fillRect(-nw / 2, -nh / 2, nw, nh);
       if (lifted) {
         g.lineWidth = 6;
@@ -147,10 +149,10 @@ export class BoardTexture {
       }
       g.fillStyle = '#2b2d42';
       const fs = Math.round(22 * Math.min(scale, nh / 164));
-      const w = this.kind === 'pulls' && workers ? workerForPull(workers.values(), it as GhPull) : undefined;
+      const w = this.kind === 'pulls' && workers ? workerForPull(workers.values(), it as Pull) : undefined;
       const footer = w ? fs * 1.3 : 0;
       g.font = `900 ${Math.round(fs * 1.35)}px Nunito, ui-rounded, system-ui, sans-serif`;
-      g.fillText(`#${it.number}`, -nw / 2 + 14, -nh / 2 + fs * 2);
+      g.fillText(refText(it), -nw / 2 + 14, -nh / 2 + fs * 2);
       g.font = `700 ${fs}px Nunito, ui-rounded, system-ui, sans-serif`;
       wrap(g, it.title, nw - 28, Math.max(2, Math.floor((nh - fs * 3 - footer) / (fs * 1.1)))).forEach((line, li) => g.fillText(line, -nw / 2 + 14, -nh / 2 + fs * 3.4 + li * fs * 1.1));
       if (w) {
@@ -302,7 +304,7 @@ export class QueueBoardTexture {
       ...done.map((t) => ({
         icon: t.outcome === 'done' ? '✅' : '⚠️',
         text: name(t),
-        side: t.pr ? `PR #${t.pr.number}${t.pr.state === 'MERGED' ? ' · merged' : ''}` : t.outcome === 'done' ? 'done' : t.outcome === 'failed' ? "didn't start" : t.outcome === 'killed' ? 'sent home' : 'stopped',
+        side: t.pr ? `PR #${t.pr.number}${t.pr.state === 'merged' ? ' · merged' : ''}` : t.outcome === 'done' ? 'done' : t.outcome === 'failed' ? "didn't start" : t.outcome === 'killed' ? 'sent home' : 'stopped',
         color: '#8a8f98',
       })),
     ];

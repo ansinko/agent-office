@@ -8,7 +8,7 @@
 // server message and from each floor you arrive on. The store runs the slices in the one order they're
 // registered in (./slices/index.ts), and that order is the order their topics fire in.
 
-import type { ChatLine, FloorInfo, FloorView, GhIssue, GhPull, GhState, Me, PeerInfo, ProjectInfo, ProjectsDirState, QueueState, QueueTask, RepoChoice, Run, ServerMsg, WorkerInfo } from '../../shared/protocol';
+import type { ChatLine, FloorInfo, FloorView, Issue, Pull, BoardState, Me, PeerInfo, ProjectInfo, ProjectsDirState, QueueState, QueueTask, RepoChoice, Run, ServerMsg, WorkerInfo } from '../../shared/protocol';
 import { randomLook } from '../../shared/avatar';
 import { AVATAR_COLORS, type Profile } from './persist';
 
@@ -103,8 +103,8 @@ export class Store {
   projectsDir: ProjectsDirState = { dir: '', custom: false };
   /** The repositories the office's gh login can clone, once asked for (see floor.repos). */
   repos: { list: RepoChoice[]; error?: string; loading: boolean; at: number } = { list: [], loading: false, at: 0 };
-  issues: GhState<GhIssue> = { items: [], fetchedAt: 0, loading: true };
-  pulls: GhState<GhPull> = { items: [], fetchedAt: 0, loading: true };
+  issues: BoardState<Issue> = { items: [], fetchedAt: 0, loading: true };
+  pulls: BoardState<Pull> = { items: [], fetchedAt: 0, loading: true };
   ice: RTCIceServer[] = [];
   chat: ChatLine[] = [];
   /** Whether this office can invite teammates (deployed with deploy/aws.sh). */
@@ -161,7 +161,7 @@ export class Store {
   }
 
   /** The queue task for an issue: the one on the queue if there is one, else the latest finished one. */
-  taskForIssue(issue: number): QueueTask | undefined {
+  taskForIssue(issue: string): QueueTask | undefined {
     const tasks = this.queue.tasks.filter((t) => t.issue === issue);
     return tasks.find((t) => t.status !== 'done') ?? tasks[tasks.length - 1];
   }

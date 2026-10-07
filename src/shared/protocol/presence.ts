@@ -11,7 +11,8 @@ import type { PlanLimits, UsageState } from './usage.js';
 
 /** The issue on a card someone carries around the floor (see PeerInfo.carrying). */
 export interface CarriedIssue {
-  issue: number;
+  /** The issue's key. */
+  issue: string;
   title: string;
 }
 
@@ -94,7 +95,7 @@ export type PresenceClientMsg =
   /** You sat down in a place on a couch, a beanbag, a chair or the bench (see seatAt in layout), or got up again (no seat). */
   | { t: 'sit'; seat?: string }
   /** You picked an issue card up off the board (or put it down again, no issue): everyone sees it in your hands. */
-  | { t: 'carry'; issue?: number; title?: string }
+  | { t: 'carry'; issue?: string; title?: string }
   /** An emote (hold G, or 1–6): everyone else on your floor sees your character do it. Rate limited, see EmoteBucket. */
   | { t: 'emote'; emote: EmoteId }
   | { t: 'profile'; name: string; color: string; look: Look }

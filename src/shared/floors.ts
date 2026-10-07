@@ -35,25 +35,7 @@ export function floorPalette(i: number): FloorPalette {
   return FLOOR_PALETTES[((i % FLOOR_PALETTES.length) + FLOOR_PALETTES.length) % FLOOR_PALETTES.length];
 }
 
-/**
- * `owner/repo` from what someone typed or pasted: owner/repo, a github.com URL (https, ssh or
- * git@), with or without .git. Undefined for anything else, so it can never become a CLI option,
- * a path or another host.
- */
-export function normalizeRepo(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  let s = value.trim();
-  if (s.length > 200) return undefined;
-  s = s.replace(/^(?:https?:\/\/|ssh:\/\/)?(?:[\w.-]+@)?github\.com[/:]/i, '');
-  s = s.replace(/[?#].*$/, '').replace(/\/+$/, '').replace(/\.git$/i, '');
-  const parts = s.split('/');
-  // A URL may go on past the repository (…/owner/repo/issues/12).
-  if (parts.length < 2) return undefined;
-  const [owner, repo] = parts;
-  if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(owner)) return undefined;
-  if (!/^[a-zA-Z0-9_.-]{1,100}$/.test(repo) || repo === '.' || repo === '..') return undefined;
-  return `${owner}/${repo}`;
-}
+export { normalizeRepo } from './hosts.js';
 
 export function sameRepo(a: string | undefined, b: string | undefined): boolean {
   return !!a && !!b && a.toLowerCase() === b.toLowerCase();

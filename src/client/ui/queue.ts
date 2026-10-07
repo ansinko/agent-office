@@ -1,5 +1,5 @@
 import './queue.css';
-import type { AgentProvider, QueueTask, Usage } from '../../shared/protocol';
+import { issueRef, type AgentProvider, type QueueTask, type Usage } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo, STATUS_LABEL } from './dom';
@@ -15,8 +15,9 @@ export interface QueueActions {
 /** The queue task's name, linked to its GitHub issue when it has one. */
 function taskTitle(t: QueueTask): HTMLElement {
   if (t.issue === undefined) return h('div.queue-title', { title: t.prompt }, t.title);
-  const issue = store.issues.items.find((i) => i.number === t.issue);
-  const text = t.title.startsWith(`#${t.issue}`) ? t.title : `#${t.issue} ${t.title}`;
+  const issue = store.issues.items.find((i) => i.key === t.issue);
+  const ref = issueRef(t.issue);
+  const text = t.title.startsWith(ref) ? t.title : `${ref} ${t.title}`;
   return h('div.queue-title', { title: t.prompt }, issue ? h('a', { href: issue.url, target: '_blank', rel: 'noopener' }, text) : text);
 }
 
@@ -129,7 +130,7 @@ export function openQueue(net: Net, actions: QueueActions) {
       if (t.workerName) meta.push(t.workerName);
       if (t.branch) meta.push(`🌿 ${t.branch}`);
       if (t.finishedAt) meta.push(timeAgo(t.finishedAt));
-      if (t.pr) buttons.push(h('a.btn', { href: t.pr.url, target: '_blank', rel: 'noopener', title: t.pr.title }, `🔀 PR #${t.pr.number}${t.pr.state === 'MERGED' ? ' ✓' : t.pr.state === 'DRAFT' ? ' (draft)' : ''}`));
+      if (t.pr) buttons.push(h('a.btn', { href: t.pr.url, target: '_blank', rel: 'noopener', title: t.pr.title }, `🔀 PR #${t.pr.number}${t.pr.state === 'merged' ? ' ✓' : t.pr.state === 'draft' ? ' (draft)' : ''}`));
       if (w) buttons.push(h('button.btn', { type: 'button', onclick: () => actions.openTerminal(w.id) }, '🖥️ Terminal'));
       buttons.push(h('button.btn', { type: 'button', title: 'Put it back on the queue', onclick: () => net.send({ t: 'queue.retry', taskId: t.id }) }, '↻ Requeue'));
       buttons.push(h('button.btn', { type: 'button', title: 'Forget it', 'aria-label': 'Remove', onclick: () => net.send({ t: 'queue.remove', taskId: t.id }) }, '✕'));

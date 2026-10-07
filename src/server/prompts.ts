@@ -1,19 +1,34 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { isAgentEffort, isAgentProvider, type AgentChoice, type AgentProvider, type PromptsState } from '../shared/protocol.js';
-import { PROMPTS, PROMPT_MAX, fillPrompt, isPromptId, promptText, type PromptId, type PromptVars } from '../shared/prompts.js';
+import { GITHUB_HOST, PROMPTS, PROMPT_MAX, isPromptId, promptText, renderText, type PromptHost, type PromptId, type PromptVars } from '../shared/prompts.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
+
+export type { PromptId, PromptVars };
 
 /** What the floors read: a prompt as the office has it now, and what workers start on. */
 export interface PromptSource {
   text(id: PromptId): string;
   /** The worker picked in ⚙️ Settings, when one was. */
   agent(): AgentChoice | undefined;
+  /** The floor's host, whose commands the prompts quote: GitHub's when there's none. */
+  host?(): PromptHost | undefined;
 }
 
-/** A prompt's text, from `source` when there is one, else the default. */
+/** A prompt's text, from `source` when there is one, else the default, quoting the source's host. */
 export function officePrompt(source: PromptSource | undefined, id: PromptId, vars: PromptVars = {}): string {
-  return fillPrompt(source ? source.text(id) : PROMPTS[id].text, vars);
+  return hostText(source, source ? source.text(id) : PROMPTS[id].text, vars);
+}
+
+/** Any text in the prompts' terms, filled in with the commands of the source's host. */
+export function hostText(source: PromptSource | undefined, text: string, vars: PromptVars = {}): string {
+  const host = source?.host?.() ?? GITHUB_HOST;
+  return renderText(text, vars, host.cli, host.name);
+}
+
+/** The office's prompts as one floor quotes them: with its own host's commands. */
+export function floorPrompts(source: PromptSource, host: () => PromptHost | undefined): PromptSource {
+  return { text: (id) => source.text(id), agent: () => source.agent(), host };
 }
 
 /**

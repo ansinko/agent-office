@@ -10,7 +10,8 @@ import { landedWorkers } from '../src/server/leave-on-merge.js';
 import { Ledger } from '../src/server/usage.js';
 import { WorkerManager, relatedBlock, withRelated, workspaceNames, type RepoSource, type WorkerEvents } from '../src/server/workers.js';
 import { Worktrees } from '../src/server/worktrees.js';
-import type { ChangesState, GhPull, WorkerInfo } from '../src/shared/protocol.js';
+import { HOSTS } from '../src/server/hosts/registry.js';
+import type { ChangesState, Pull, WorkerInfo } from '../src/shared/protocol.js';
 
 // A worker across repositories (WorkerInfo.repos): hired on one floor with other floors' projects,
 // it works in a workspace holding a worktree of each, all on one branch, and opens a PR in each.
@@ -280,11 +281,11 @@ test('O opens a pull request in each repository with commits, and each one lists
 });
 
 test('the list of related pull requests goes in once and is replaced after', () => {
-  const block = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }, { repo: 'api', url: 'https://github.com/acme/api/pull/9' }], 'https://github.com/acme/api/pull/9', 'office/pip-1');
+  const block = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }, { repo: 'api', url: 'https://github.com/acme/api/pull/9' }], 'https://github.com/acme/api/pull/9', 'office/pip-1', HOSTS.github!.pulls('/tmp', () => {}));
   assert.match(block, /- \*\*web\*\*: acme\/web#3\n- \*\*api\*\*: acme\/api#9 \(this one\)/);
   const once = withRelated('## Task\n\nDo it\n', block);
   assert.equal(once, `## Task\n\nDo it\n\n${block}`);
-  const newer = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }], 'x', 'office/pip-1');
+  const newer = relatedBlock([{ repo: 'web', url: 'https://github.com/acme/web/pull/3' }], 'x', 'office/pip-1', HOSTS.github!.pulls('/tmp', () => {}));
   assert.equal(withRelated(`${once}\n\nsigned`, newer), `## Task\n\nDo it\n\n${newer}\n\nsigned`);
   assert.equal(withRelated('', block), block);
 });
@@ -335,8 +336,8 @@ test('prune leaves a workspace with worktrees in it alone, and lists the other r
   assert.deepEqual([...theirs.elsewhere], [['office/pip-1', path.join(f.a, '.agent-office', 'worktrees', 'pip-1', 'api')]]);
 });
 
-const pull = (number: number, state: string, headRefName: string, headRefOid?: string): GhPull => ({
-  number, title: `PR ${number}`, state, isDraft: false, url: '', author: '', labels: [], reviewDecision: '',
+const pull = (number: number, state: Pull['state'], headRefName: string, headRefOid?: string): Pull => ({
+  number, title: `PR ${number}`, state, url: '', author: '', labels: [], review: 'none',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0,
   checks: 'none', body: '', closes: [],
 });
@@ -347,17 +348,17 @@ test('a worker across repositories goes home once its pull requests have merged 
     worktree: { path: '.agent-office/worktrees/pip-1/web', branch: 'office/pip-1', base: 'a' },
     repos: [{ floor: 'api', name: 'api', dir: '/api', path: '.agent-office/worktrees/pip-1/api', branch: 'office/pip-1', base: 'b', pr: { number: 9, url: '' } }],
   };
-  const web = [pull(3, 'MERGED', 'office/pip-1', 'h3')];
-  const floors = (api: GhPull[] | undefined) => (id: string) => (id === 'api' ? api : undefined);
+  const web = [pull(3, 'merged', 'office/pip-1', 'h3')];
+  const floors = (api: Pull[] | undefined) => (id: string) => (id === 'api' ? api : undefined);
   // api's PR still open, or not on api's list (yet): it stays.
-  assert.deepEqual(landedWorkers([w], web, [], floors([pull(9, 'OPEN', 'office/pip-1')])), []);
+  assert.deepEqual(landedWorkers([w], web, [], floors([pull(9, 'open', 'office/pip-1')])), []);
   assert.deepEqual(landedWorkers([w], web, [], floors([])), []);
   assert.deepEqual(landedWorkers([w], web, [], floors(undefined)), []);
   // Both merged: it goes, with each merged head.
-  assert.deepEqual(landedWorkers([w], web, [], floors([pull(9, 'MERGED', 'office/pip-1', 'h9')])), [{ worker: w, pr: 3, head: 'h3', heads: { api: 'h9' }, prs: ['web #3', 'api #9'] }]);
+  assert.deepEqual(landedWorkers([w], web, [], floors([pull(9, 'merged', 'office/pip-1', 'h9')])), [{ worker: w, pr: 3, head: 'h3', heads: { api: 'h9' }, prs: ['web #3', 'api #9'] }]);
   // Only api had work: its PR merging is enough.
   const apiOnly = { ...w, repos: [{ ...w.repos![0] }] };
-  assert.deepEqual(landedWorkers([apiOnly], [], [], floors([pull(9, 'MERGED', 'office/pip-1', 'h9')])).map((l) => l.prs), [['api #9']]);
+  assert.deepEqual(landedWorkers([apiOnly], [], [], floors([pull(9, 'merged', 'office/pip-1', 'h9')])).map((l) => l.prs), [['api #9']]);
   // web's own PR open: it stays.
-  assert.deepEqual(landedWorkers([w], [pull(3, 'OPEN', 'office/pip-1')], [], floors([pull(9, 'MERGED', 'office/pip-1')])), []);
+  assert.deepEqual(landedWorkers([w], [pull(3, 'open', 'office/pip-1')], [], floors([pull(9, 'merged', 'office/pip-1')])), []);
 });

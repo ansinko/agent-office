@@ -1,13 +1,13 @@
 import './meeting.css';
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
-import { fmtTokens, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
+import { fmtTokens, issueRef, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo, toast, STATUS_LABEL, type Modal } from './dom';
 import { confirmDialog } from './prompt';
 import { providerPicker } from './provider';
 import { officePrompt } from './prompts';
-import { issueVars } from './github/prompts';
+import { issueVars } from './board-windows/prompts';
 import { dictateField } from './dictate';
 
 /** What a meeting called from an issue, a PR or a task starts out with. */
@@ -16,7 +16,8 @@ export interface MeetingPreset {
   prompt?: string;
   title?: string;
   pr?: number;
-  issue?: number;
+  /** The issue's key. */
+  issue?: string;
 }
 
 export interface MeetingActions {
@@ -26,8 +27,8 @@ export interface MeetingActions {
 }
 
 /** A meeting about a GitHub issue: the form filled in with it. */
-export function issueMeeting(n: number, title: string): MeetingPreset {
-  return { issue: n, title: `#${n} ${title}`, prompt: officePrompt('issue.meeting', issueVars({ number: n, title })) };
+export function issueMeeting(key: string, title: string): MeetingPreset {
+  return { issue: key, title: `${issueRef(key)} ${title}`, prompt: officePrompt('issue.meeting', issueVars({ key, title })) };
 }
 
 const PART_LABEL: Record<MeetingTurn['state'], string> = { waiting: '⏳ up next', sent: '📨 handed over', working: '💬 on it', done: '✅ written' };
@@ -273,7 +274,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
 
   /** Keeps what depends on the board and the room up to date: the open PRs, and whether the room is free. */
   const refresh = () => {
-    const open = store.pulls.items.filter((p) => p.state === 'OPEN');
+    const open = store.pulls.items.filter((p) => p.state === 'open' || p.state === 'draft');
     const want = prSel.value || (preset?.pr ? String(preset.pr) : '');
     const opts: (readonly [string, string])[] = open.map((p) => [String(p.number), `#${p.number} ${p.title}`] as const);
     if (preset?.pr && !open.some((p) => p.number === preset.pr)) opts.unshift([String(preset.pr), `#${preset.pr}`]);

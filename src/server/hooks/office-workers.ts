@@ -7,6 +7,7 @@ import { issueRef, type PullState, type WorkerInfo } from '../../shared/protocol
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
+import { workerRestroomRefusal } from '../restroom.js';
 
 /**
  * Pull request `n` on a floor, for a worker to have as its own: one that's open, or merged and still
@@ -52,7 +53,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   const action = url.pathname.slice('/office/workers'.length);
   if (req.method === 'GET' && !action) {
     const list = floor.workers.list();
-    const free = nextFreeSeat((id) => floor.workers.deskOccupied(id), floor.plan.wing);
+    const free = nextFreeSeat((id) => floor.workers.deskOccupied(id));
     return send(res, 200, {
       floor: { id: floor.id, name: floor.def.name, repo: floor.def.repo, branch: floor.project.branch },
       you: me.id,
@@ -92,7 +93,11 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
         const w = findWorker(floor.workers.list(), key);
         if (typeof w === 'string') results.push({ worker: key, error: w });
         else if (w.id === me.id) results.push({ worker: w.name, id: w.id, error: "That's you: someone else has to send you home" });
-        else if (!going.some((g) => g.w === w)) going.push({ w });
+        else {
+          const refused = workerRestroomRefusal(w.deskId);
+          if (refused) results.push({ worker: w.name, id: w.id, error: refused });
+          else if (!going.some((g) => g.w === w)) going.push({ w });
+        }
       }
     }
     // One at a time: git takes a lock on the repository's refs to delete a branch.
@@ -115,6 +120,8 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const w = findWorker(floor.workers.list(), str(b.worker, 64));
     if (typeof w === 'string') return send(res, 404, { error: w });
     if (w.id === me.id) return send(res, 400, { error: "That's you" });
+    const refused = workerRestroomRefusal(w.deskId);
+    if (refused) return send(res, 403, { error: refused });
     // A shell would run it as a command, in someone's terminal.
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
     const text = str(b.prompt, 20000).replace(/\r\n?/g, '\n').trim();
@@ -143,7 +150,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
 
   const ask = readHireRequest(body, floor.project.agentProviders);
   if (typeof ask === 'string') return send(res, 400, { error: ask });
-  const desk = ask.desk ?? nextFreeSeat((id) => floor.workers.deskOccupied(id), floor.plan.wing)?.id;
+  const desk = ask.desk ?? nextFreeSeat((id) => floor.workers.deskOccupied(id))?.id;
   if (!desk) return send(res, 409, { error: 'Every desk and bean bag is taken: send someone home first' });
   // A model or effort is the office's default worker's unless it says whose.
   const provider = ask.provider ?? (ask.model || ask.effort ? floor.workers.officeDefault.provider : undefined);

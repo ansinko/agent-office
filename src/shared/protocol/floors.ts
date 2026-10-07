@@ -65,8 +65,6 @@ export interface FloorInfo {
   /** Workers waiting on someone: a question, a permission, or a finished turn nobody looked at. */
   waiting: number;
   people: number;
-  /** How many rows its back office is built out (see WING), for the building's outside. */
-  wing: number;
 }
 
 /** How far a new floor's clone has got, from git's progress. */
@@ -111,7 +109,7 @@ export interface FloorView {
   queue: QueueState;
   /** Pictures on this floor's walls. */
   decor: Decoration[];
-  /** The signs over this floor's desks, and how far its back office is built out. */
+  /** The signs over this floor's desks. */
   plan: FloorPlan;
   services: ServicesState;
   /** The floor's dog; null in a building with no floors yet. */
@@ -154,10 +152,7 @@ export type FloorClientMsg =
 
 export type PlanClientMsg =
   /** Hang a sign over a desk on your floor (a SIGN_COLORS color), or take it down with no text. */
-  | { t: 'desk.label'; deskId: string; text: string; color?: string }
-  /** Knock the back office out another row, with two more desks; or wall its last row back up. */
-  | { t: 'floor.expand' }
-  | { t: 'floor.shrink' };
+  | { t: 'desk.label'; deskId: string; text: string; color?: string };
 
 export type FloorServerMsg =
   /** You arrived on another floor: everything on it, replacing the last one's, and where everyone is now. */
@@ -169,5 +164,5 @@ export type FloorServerMsg =
   | { t: 'floor.added'; repo: string; floor?: string; error?: string }
   /** The projects folder moved (see floor.projectsDir). */
   | { t: 'projectsDir'; state: ProjectsDirState }
-  /** Your floor's signs changed, or its back office was built out or walled up. */
+  /** Your floor's signs changed. */
   | { t: 'plan'; plan: FloorPlan };

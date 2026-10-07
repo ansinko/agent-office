@@ -97,7 +97,7 @@ test('links in a doc resolve to paths in the project, and nowhere else', () => {
   assert.ok(!isDocPath('a.mdx') && !isDocPath('../a.md') && !isDocPath('a/./b.md') && !isDocPath('md'));
 });
 
-test('.bookshelf.json globs: ** crosses folders, * stays in one, a bare name matches at any depth', () => {
+test('bookshelf.json globs: ** crosses folders, * stays in one, a bare name matches at any depth', () => {
   assert.ok(globMatch('docs/plans/**', 'docs/plans/a/b.md'));
   assert.ok(globMatch('docs/plans/', 'docs/plans/x.md'));
   assert.ok(globMatch('**/test-cases/**', 'platform/svc/test-cases/01/a.md'));
@@ -131,7 +131,6 @@ function cloned(t: { after(fn: () => void): void }) {
   put(seed, 'docs/README.md', '# Start here\n');
   put(seed, 'docs/plans/w1.md', '# Wave one\n');
   put(seed, 'docs/pic.png', Buffer.from([0x89, 0x50, 0x4e, 0x47]));
-  put(seed, '.bookshelf.json', '{"start":"docs/README.md","hide":["docs/plans/**"]}');
   sh(seed, 'add', '.');
   sh(seed, 'commit', '-qm', 'docs');
   sh(seed, 'remote', 'add', 'origin', origin);
@@ -139,6 +138,8 @@ function cloned(t: { after(fn: () => void): void }) {
   const dir = path.join(root, 'proj');
   sh(root, 'clone', '-q', origin, dir);
   sh(dir, 'checkout', '-q', '-b', 'feature/x');
+  // The floor's own layout of the shelf: the office's data, never the project's.
+  put(dir, '.agent-office/bookshelf.json', '{"start":"docs/README.md","hide":["docs/plans/**"]}');
   put(dir, 'docs/feature.md', '# Only on the feature branch\n');
   // Merged on origin after the clone: only a fetch brings it.
   put(seed, 'docs/merged.md', '# Merged since\n');
@@ -161,6 +162,8 @@ test("the shelf reads origin's main as git has it, fetched, whatever the checkou
     { ref: 'origin/main', label: 'main on origin' },
   ]);
   assert.ok(here.files.some((f) => f.path === 'docs/feature.md'));
+  assert.equal(here.start, 'docs/README.md');
+  assert.equal(here.files.find((f) => f.path === 'docs/plans/w1.md')?.hidden, true);
   assert.ok(!here.files.some((f) => f.path === 'docs/merged.md'));
 
   const main = listed(await docs.list('origin/main'));

@@ -11,6 +11,8 @@ export interface InteractionState {
   room: boolean;
   note: Issue | null;
   carrying: boolean;
+  /** The key besides E that the seat in reach takes, while you sit on it (see SeatUse's extra). */
+  seatKey?: DeskKey;
 }
 
 /** Whether a desk key has an action at the interaction currently in reach. */
@@ -39,6 +41,7 @@ export function interactionAvailable(it: Interactable | null, key: DeskKey, stat
   }
 
   if (state.note && it.kind === 'issues') return key === 'E' || key === 'O';
+  if (it.kind === 'seat' && key === state.seatKey) return !!it.seatId;
   if (key !== 'E') return false;
 
   if (it.kind === 'decor') return !!it.decorId;

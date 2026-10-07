@@ -26,7 +26,7 @@ const MAX_DEPTH = 12;
 
 type Failure = { status: number; error: string };
 
-/** What a source has on its shelf, before .bookshelf.json has its say. */
+/** What a source has on its shelf, before bookshelf.json has its say. */
 type Listing = { files: DocFile[]; more: boolean };
 
 /** The paths git lists, or undefined when the folder isn't in a git checkout (or there's no git). */
@@ -121,29 +121,27 @@ export class Docs {
   /** The same shelf on origin's default branch (docs-branch.ts). */
   private branch: BranchShelf;
 
-  constructor(private dir: string) {
+  /** `dataDir` is the floor's own folder, where its bookshelf.json is. */
+  constructor(
+    private dir: string,
+    private dataDir = path.join(dir, '.agent-office'),
+  ) {
     this.branch = new BranchShelf(dir, docTitle, HEAD_BYTES);
   }
 
   /**
    * Every Markdown file in the project, by path: in the checkout, or with `source` on the branch it
-   * names (one of the list's `sources`). The project's .bookshelf.json there picks the doc to open
-   * first and the docs to leave off the list.
+   * names (one of the list's `sources`). The floor's bookshelf.json picks the doc to open first and
+   * the docs to leave off the list, whichever source it is.
    */
   async list(source = ''): Promise<DocList | Failure> {
     const sources = await this.branch.sources();
     if (!sources.some((s) => s.ref === source)) return { status: 404, error: "The bookshelf can't read from there" };
     const found = source ? await this.branch.list(source, MAX_DOCS) : await this.checkout();
-    const config = parseShelfConfig(await this.configText(source));
+    const config = parseShelfConfig(await readFile(path.join(this.dataDir, SHELF_CONFIG), 'utf8').catch(() => undefined));
     const files = found.files.map((f) => (config.hide.some((g) => globMatch(g, f.path)) ? { ...f, hidden: true } : f));
     const start = config.start && files.some((f) => f.path === config.start) ? config.start : undefined;
     return { files, more: found.more, source, sources, start };
-  }
-
-  private async configText(source: string): Promise<string | undefined> {
-    if (!source) return readFile(path.join(this.dir, SHELF_CONFIG), 'utf8').catch(() => undefined);
-    const r = await this.branch.file(source, SHELF_CONFIG, HEAD_BYTES * 16).catch(() => undefined);
-    return Buffer.isBuffer(r) ? r.toString('utf8') : undefined;
   }
 
   private checkout(): Promise<Listing> {

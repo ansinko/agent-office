@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, MEETING_ROOM, MEETING_SEATS, PARACHUTE, ROAD, SEATS, STATIONS, WING, deskBuilt, wingMinZ, type DeskDef } from '../src/shared/layout.js';
+import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, MEETING_ROOM, MEETING_SEATS, PARACHUTE, RESTROOM, ROAD, SEATING_BY_ID, SEATS, STATIONS, WING, seatPlace, wingMinZ, type DeskDef } from '../src/shared/layout.js';
 import { route, walkable, wayHome, wayIn, wayToBalcony, type Pt } from '../src/shared/nav.js';
 
-/** Every place a worker can be on a floor built out `wing` rows, at each build-out there is. */
-const everywhere = (): [DeskDef, number][] => Array.from({ length: WING.rows + 1 }, (_, wing) => [...SEATS, ...STATIONS, ...MEETING_SEATS].filter((d) => deskBuilt(d, wing)).map((d): [DeskDef, number] => [d, wing])).flat();
+/** Every place a worker can be on an office floor, with its back office (see WING). */
+const everywhere = (): [DeskDef, number][] => [...SEATS, ...STATIONS, ...MEETING_SEATS].map((d): [DeskDef, number] => [d, WING.rows]);
 
 test('a worker sent home walks round the furniture, out the exit door and off along the sidewalk', () => {
   for (const [seat, wing] of everywhere()) {
@@ -85,18 +85,50 @@ test('upstairs, with no exit door, a worker sent home walks out onto the balcony
   }
 });
 
-test('the back office is only floor once it is built out, and only as far as it goes', () => {
+test('the back office is floor on an office floor, as far as its back wall', () => {
   const inside: Pt = [(WING.minX + WING.maxX) / 2 + 1.7, FLOOR.minZ - 1];
-  assert.equal(walkable(inside[0], inside[1], 0), false, 'behind the north wall there is nothing');
-  for (let wing = 1; wing <= WING.rows; wing++) {
-    assert.ok(walkable(inside[0], inside[1], wing), `built out ${wing}, its first row is open floor`);
-    assert.equal(walkable(inside[0], wingMinZ(wing) - 0.5, wing), false, `built out ${wing}, past its back wall is not`);
-    // And there's a way from the room to the back of it.
-    const back: Pt = [WING.minX + 0.6, wingMinZ(wing) + 0.6];
-    const way = route([0, 0], back, wing);
-    const [ex, ez] = way[way.length - 1];
-    assert.ok(Math.hypot(ex - back[0], ez - back[1]) < 0.6, `built out ${wing}, the route gets to the back of it`);
-  }
+  assert.equal(walkable(inside[0], inside[1], 0), false, 'with no back office, behind the north wall there is nothing');
+  assert.ok(walkable(inside[0], inside[1], WING.rows), 'its row is open floor');
+  assert.equal(walkable(inside[0], wingMinZ(WING.rows) - 0.5, WING.rows), false, 'past its back wall is not');
   // Nowhere else through the north wall.
   assert.equal(walkable(0, FLOOR.minZ - 1, WING.rows), false);
+});
+
+test("the restroom's fittings are in the way, and its door is the way in", () => {
+  const { door, table, cubicle, toilet, sink } = RESTROOM;
+  const wall = RESTROOM.maxZ - RESTROOM.wall / 2;
+  const blocked: [string, number, number][] = [
+    ['the wall beside the door', door.x + door.width / 2 + 0.5, wall],
+    ["the hajzel baba's table", table.x, table.z],
+    ['her chair', table.x + table.chair, table.z],
+    ["the cubicle's side wall", cubicle.minX, (RESTROOM.minZ + cubicle.maxZ) / 2],
+    ["the cubicle's front beside its door", cubicle.minX + 0.2, cubicle.maxZ],
+    ['the toilet', toilet.x, toilet.z],
+    ['the sink', sink.x, sink.z],
+  ];
+  for (const [what, x, z] of blocked) assert.equal(walkable(x, z, WING.rows), false, what);
+  assert.ok(walkable(door.x, wall, WING.rows), 'the doorway');
+  assert.ok(walkable(cubicle.door.x, cubicle.maxZ, WING.rows), "the cubicle's doorway");
+});
+
+test('the toilet can be walked up to from the room, in by the door and the cubicle door', () => {
+  const place = seatPlace(SEATING_BY_ID.get('toilet')!, 0);
+  const front: Pt = [place.x + Math.sin(place.rotY) * place.out, place.z + Math.cos(place.rotY) * place.out];
+  const way = route([0, 0], front, WING.rows);
+  const [ex, ez] = way[way.length - 1];
+  assert.ok(Math.hypot(ex - front[0], ez - front[1]) < 0.6, 'the route gets in front of the toilet');
+  for (let i = 1; i < way.length; i++) {
+    const [x0, z0] = way[i - 1];
+    const [x1, z1] = way[i];
+    const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.2);
+    for (let k = 0; k <= n; k++) assert.ok(walkable(x0 + ((x1 - x0) * k) / n, z0 + ((z1 - z0) * k) / n, WING.rows), `step ${i} walks into something`);
+  }
+  // Where it crosses the restroom's wall and the cubicle's, it's through their doors.
+  const crossing = (z: number) => {
+    const i = way.findIndex(([, wz], j) => j > 0 && way[j - 1][1] > z && wz <= z);
+    const [[ax, az], [bx, bz]] = [way[i - 1], way[i]];
+    return ax + ((bx - ax) * (z - az)) / (bz - az);
+  };
+  assert.ok(Math.abs(crossing(RESTROOM.maxZ) - RESTROOM.door.x) < RESTROOM.door.width / 2, 'in by the restroom door');
+  assert.ok(Math.abs(crossing(RESTROOM.cubicle.maxZ) - RESTROOM.cubicle.door.x) < RESTROOM.cubicle.door.width / 2, 'in by the cubicle door');
 });

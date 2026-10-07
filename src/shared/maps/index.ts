@@ -1,4 +1,4 @@
-import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, STATIONS, STATION_AGENT, WALL_HEIGHT, WING_DESKS, seatHere, seatPlace, type DeskDef, type SeatDef, type SeatPlace, type StationKind } from '../layout.js';
+import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, STATIONS, STATION_AGENT, WALL_HEIGHT, seatHere, seatPlace, type BoardStationKind, type DeskDef, type SeatDef, type SeatPlace } from '../layout.js';
 import type { Circle, Rect } from '../nav.js';
 import { planAirlock, wallOpenings } from './airlock.js';
 import { CASTLE } from './castle.js';
@@ -24,7 +24,8 @@ const STYLE_PROPS: Record<MapStyle, { kinds: Readonly<Record<string, string>>; f
   station: { kinds: STATION_PROP_KINDS, footprint: stationFootprint, top: stationTop },
 };
 
-const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue'];
+/** The board agents a map puts up lecterns for: the restroom is the office's alone. */
+const STATION_KINDS: readonly BoardStationKind[] = ['issues', 'pulls', 'queue'];
 /** How far in from a table's edge a seat's place setting is; the worker sits 0.85 out from it (see deskSeat), on the bench. */
 const PLACE_IN = 0.35;
 /** How far out from a table's edge the middle of the bench down that side is. */
@@ -50,12 +51,8 @@ const DEFAULT_BOARD_LABEL: Record<BoardKey, string> = { issues: 'Issues', queue:
 
 // ---- The office -----------------------------------------------------------------------------------
 
-/**
- * Every map's desks, by id: the office's room, then its back office (see WING), which is only there to
- * sit at on a floor built out that far (deskBuilt), on whichever map, so a worker hired there has a
- * seat on every map.
- */
-const MAP_DESKS: DeskDef[] = [...DESKS, ...WING_DESKS];
+/** Every map's desks, by id: the office's, so a worker hired at one has a seat on every map. */
+const MAP_DESKS: DeskDef[] = DESKS;
 
 function officePlan(): MapPlan {
   const byId = new Map([...MAP_DESKS, ...BEANBAGS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));

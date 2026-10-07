@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOOR, WING, WING_DESKS, wingMinZ } from '../src/shared/layout.js';
+import { FLOOR, WING, wingMinZ } from '../src/shared/layout.js';
 import type { FloorInfo } from '../src/shared/protocol.js';
-import { builtFloors, floorWings, pastTheWing, seatBuilt } from '../src/client/core/floors.js';
+import { builtFloors, floorWings, pastTheWing } from '../src/client/core/floors.js';
 import { store } from '../src/client/state/index.js';
 
 const floor = (id: string, extra: Partial<FloorInfo> = {}) => ({ id, name: id, waiting: 0, people: 0, palette: 0, ...extra }) as FloorInfo;
@@ -15,26 +15,9 @@ test('the built floors leave out the ones still being cloned', () => {
   );
 });
 
-test("each floor's back office goes as far as its own, the one you're on as its plan has it", () => {
-  const floors = [floor('a', { wing: 2 }), floor('b'), floor('c', { wing: 1 })];
-  store.floor = 'b';
-  store.floorPlan = { wing: 1, labels: {} };
-  assert.deepEqual(floorWings(floors), [2, 1, 1]);
-  store.floor = null;
-  assert.deepEqual(floorWings(floors), [2, 0, 1]);
-});
-
-test("a back office desk is there to sit at once the floor's built out that far; any other seat always is", () => {
-  const first = WING_DESKS.find((d) => d.wing === 1)!;
-  const second = WING_DESKS.find((d) => d.wing === 2)!;
-  store.floorPlan = { wing: 0, labels: {} };
-  assert.equal(seatBuilt(first.id), false);
-  assert.equal(seatBuilt('no-such-desk'), true);
-  store.floorPlan = { wing: 1, labels: {} };
-  assert.equal(seatBuilt(first.id), true);
-  assert.equal(seatBuilt(second.id), false);
-  store.floorPlan = { wing: WING.rows, labels: {} };
-  assert.equal(seatBuilt(second.id), true);
+test("every floor has its back office, the restroom, one row deep", () => {
+  assert.equal(WING.rows, 1);
+  assert.deepEqual(floorWings([floor('a'), floor('b'), floor('c')]), [1, 1, 1]);
 });
 
 test("past the wing: standing where the back office would be, further back than this floor's goes", () => {

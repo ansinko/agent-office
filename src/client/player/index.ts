@@ -55,6 +55,8 @@ export class PlayerController extends PlayerInput {
   seat: SeatPlace | null = null;
   /** You got up by walking off or jumping (not by stand()). */
   onStand: (() => void) | null = null;
+  /** Asked as you walk off or jump up from a seat: false keeps you sitting there (see features/seating). */
+  mayGetUp: (() => boolean) | null = null;
   /** Corners still to walk through on your own (see walkPath), or null while you're steering. */
   private path: { x: number; z: number }[] | null = null;
   /** How long a walk along `path` has been getting nowhere. */
@@ -164,7 +166,7 @@ export class PlayerController extends PlayerInput {
       return;
     }
     if (this.seat) {
-      if (!this.enabled || !GET_UP.some((c) => k.has(c))) {
+      if (!this.enabled || !GET_UP.some((c) => k.has(c)) || this.mayGetUp?.() === false) {
         this.moving = false;
         this.facing = this.seat.rotY;
         this.jitterT += dt;

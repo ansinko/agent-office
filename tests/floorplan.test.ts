@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FloorPlanStore } from '../src/server/floorplan.js';
 import { MAX_LABEL, SIGN_COLORS, cleanLabel, cleanPlan } from '../src/shared/floorplan.js';
-import { BEANBAGS, DESKS, WING, WING_DESKS, beanbagsOut, builtDesks, nextFreeSeat } from '../src/shared/layout.js';
+import { BEANBAGS, DESKS, beanbagsOut, nextFreeSeat } from '../src/shared/layout.js';
 
 function withDir(fn: (dir: string) => void) {
   const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-floorplan-'));
@@ -36,12 +36,10 @@ test('signs go up over desks, get changed and come down, and stay across restart
   });
 });
 
-test('only desks get signs: not bean bags, kiosks or the meeting table', () => {
+test('only desks get signs: not bean bags, kiosks, the restroom or the meeting table', () => {
   withDir((dir) => {
     const plan = new FloorPlanStore(dir);
-    for (const id of ['beanbag-1', 'station-queue', 'meeting-1', 'nope']) assert.equal(typeof plan.label(id, 'Ops', undefined, 'Ada'), 'string', id);
-    // The back office's desks can have one before they're built, ready for when they are.
-    assert.equal(typeof plan.label(WING_DESKS[0].id, 'Ops', undefined, 'Ada'), 'object');
+    for (const id of ['beanbag-1', 'station-queue', 'station-restroom', 'meeting-1', 'desk-17', 'nope']) assert.equal(typeof plan.label(id, 'Ops', undefined, 'Ada'), 'string', id);
   });
 });
 
@@ -51,30 +49,12 @@ test("a sign's text is one tidy line, no longer than a sign", () => {
   assert.equal(cleanLabel(42), '');
 });
 
-test('the back office goes back a row at a time, as far as it can, and walls up only when nobody is there', () => {
-  withDir((dir) => {
-    const plan = new FloorPlanStore(dir);
-    assert.equal(plan.wing, 0);
-    assert.equal(typeof plan.shrink(() => false), 'string', 'nothing to wall up yet');
-    for (let row = 1; row <= WING.rows; row++) {
-      const came = plan.expand();
-      assert.deepEqual(came, WING_DESKS.filter((d) => d.wing === row).map((d) => d.id));
-    }
-    assert.equal(typeof plan.expand(), 'string', "it can't go back any further");
-    assert.equal(new FloorPlanStore(dir).wing, WING.rows, 'it stays built across a restart');
-    const last = WING_DESKS.filter((d) => d.wing === WING.rows);
-    assert.match(plan.shrink((id) => id === last[1].id) as string, new RegExp(last[1].label));
-    assert.equal(plan.wing, WING.rows);
-    assert.deepEqual(plan.shrink(() => false), last.map((d) => d.id));
-    assert.equal(plan.wing, WING.rows - 1);
-  });
-});
-
 test('a broken or tampered plan file comes back as what is valid of it', () => {
   withDir((dir) => {
-    writeFileSync(path.join(dir, 'floorplan.json'), JSON.stringify({ wing: 99, labels: { 'desk-1': { text: 'Ops', color: 'red' }, 'beanbag-2': { text: 'x' }, 'desk-2': { text: '   ' } } }));
+    // A back office built out by an older office is a key nobody reads.
+    writeFileSync(path.join(dir, 'floorplan.json'), JSON.stringify({ wing: 2, labels: { 'desk-1': { text: 'Ops', color: 'red' }, 'beanbag-2': { text: 'x' }, 'desk-2': { text: '   ' } } }));
     const plan = new FloorPlanStore(dir).state();
-    assert.equal(plan.wing, WING.rows);
+    assert.deepEqual(Object.keys(plan), ['labels']);
     assert.deepEqual(Object.keys(plan.labels), ['desk-1']);
     assert.equal(plan.labels['desk-1'].color, SIGN_COLORS[0].color);
     writeFileSync(path.join(dir, 'floorplan.json'), '{nope');
@@ -83,14 +63,11 @@ test('a broken or tampered plan file comes back as what is valid of it', () => {
   });
 });
 
-test('new workers take the back office desks once it is built, before any bean bag', () => {
+test('new workers take a free desk, and the bean bags come out once every desk is taken', () => {
   const taken = new Set(DESKS.map((d) => d.id));
-  assert.equal(nextFreeSeat((id) => taken.has(id))?.id, BEANBAGS[0].id, 'with no back office, the bean bags come out');
-  assert.equal(nextFreeSeat((id) => taken.has(id), 1)?.id, WING_DESKS[0].id);
-  // Bean bags only come out once the back office's desks are taken too.
+  assert.equal(nextFreeSeat((id) => taken.has(id))?.id, BEANBAGS[0].id);
   assert.equal(beanbagsOut((id) => taken.has(id)).size, 1);
-  assert.equal(beanbagsOut((id) => taken.has(id), 1).size, 0);
-  for (const d of builtDesks(1)) taken.add(d.id);
-  assert.equal(beanbagsOut((id) => taken.has(id), 1).size, 1);
-  assert.equal(nextFreeSeat((id) => taken.has(id), 1)?.id, BEANBAGS[0].id);
+  taken.delete(DESKS[3].id);
+  assert.equal(nextFreeSeat((id) => taken.has(id))?.id, DESKS[3].id);
+  assert.equal(beanbagsOut((id) => taken.has(id)).size, 0);
 });

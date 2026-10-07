@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DESKS, DESK_BY_ID, DESK_SIZE, WALL_HEIGHT, WING_DESKS, type DeskDef } from '../../shared/layout';
+import { DESKS, DESK_BY_ID, DESK_SIZE, WALL_HEIGHT, type DeskDef } from '../../shared/layout';
 import { signInk, type DeskLabel } from '../../shared/floorplan';
 import type { Fixture } from './office/fixture';
 import { mergeByMaterial, mesh, roundedBox, toon } from './toon';
@@ -18,8 +18,8 @@ const PX = 1024;
 
 /** Each desk's partner, back to back with it across the pair. */
 const PARTNER = new Map<string, string>();
-for (const d of [...DESKS, ...WING_DESKS]) {
-  const p = [...DESKS, ...WING_DESKS].find((e) => e !== d && Math.abs(e.x - d.x) < 0.01 && Math.abs(Math.abs(e.z - d.z) - DESK_SIZE.depth) < 0.01 && Math.abs(Math.cos(e.rotY) + Math.cos(d.rotY)) < 0.01);
+for (const d of DESKS) {
+  const p = DESKS.find((e) => e !== d && Math.abs(e.x - d.x) < 0.01 && Math.abs(Math.abs(e.z - d.z) - DESK_SIZE.depth) < 0.01 && Math.abs(Math.cos(e.rotY) + Math.cos(d.rotY)) < 0.01);
   if (p) PARTNER.set(d.id, p.id);
 }
 const FONT = (size: number) => `800 ${size}px Nunito, ui-rounded, system-ui, sans-serif`;
@@ -83,8 +83,8 @@ interface Hung {
 
 export interface DeskSigns {
   group: THREE.Group;
-  /** Hangs a sign for each of `labels`, over the desks `built` says are there (the back office's may not be yet). */
-  set(labels: Record<string, DeskLabel>, built: (desk: DeskDef) => boolean): void;
+  /** Hangs a sign for each of `labels`. */
+  set(labels: Record<string, DeskLabel>): void;
   /** The sign over a desk, if it has one. */
   get(deskId: string): THREE.Object3D | undefined;
 }
@@ -142,10 +142,9 @@ export function buildDeskSigns(): DeskSigns {
     h.tex.dispose();
   };
   /** Whether the sign over `id` says it on its back too: its partner across the pair has no sign of its own there. */
-  const twoSided = (id: string, labels: Record<string, DeskLabel>, built: (desk: DeskDef) => boolean) => {
+  const twoSided = (id: string, labels: Record<string, DeskLabel>) => {
     const other = PARTNER.get(id);
-    const desk = other ? DESK_BY_ID.get(other) : undefined;
-    return !!desk && built(desk) && !labels[desk.id];
+    return !!other && !labels[other];
   };
 
   // The office's font may still be on its way the first time a sign is painted.
@@ -159,10 +158,10 @@ export function buildDeskSigns(): DeskSigns {
   return {
     group,
     get: (deskId) => hung.get(deskId)?.root,
-    set(labels, built) {
+    set(labels) {
       for (const [id, h] of hung) {
         const l = labels[id];
-        if (l && keyOf(l, twoSided(id, labels, built)) === h.key) continue;
+        if (l && keyOf(l, twoSided(id, labels)) === h.key) continue;
         drop(h);
         hung.delete(id);
       }
@@ -170,8 +169,7 @@ export function buildDeskSigns(): DeskSigns {
         const desk = DESK_BY_ID.get(id);
         if (!desk) continue;
         let h = hung.get(id);
-        if (!h) hung.set(id, (h = make(desk, label, twoSided(id, labels, built))));
-        h.root.visible = built(desk);
+        if (!h) hung.set(id, make(desk, label, twoSided(id, labels)));
       }
     },
   };

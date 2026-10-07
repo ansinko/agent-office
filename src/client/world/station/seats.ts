@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { KIOSK, STATION_AGENT, deskSeat, type BoardStationKind, type DeskDef } from '../../../shared/layout';
 import { BENCH_OUT, COUNCIL, THRONE_SIZE } from '../../../shared/maps';
 import { boxFootprint } from '../../../shared/maps/props';
 import { deskPoint } from '../../../shared/nav';
@@ -71,11 +71,12 @@ export function placeSetting(kit: Kit, def: DeskDef, overflow: boolean): { view:
   return { view: { def, group: g, laptopAnchor, seatAnchor, stage, chair: new THREE.Group(), vacancy, vacancyY: 1.35 }, it };
 }
 
-const CONSOLE_SIGN: Record<StationKind, string> = { issues: '📡 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
+const CONSOLE_SIGN: Record<BoardStationKind, string> = { issues: '📡 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
 
 /** A board agent's console: a slanted panel on a pedestal, lit in the agent's color; it stands behind it, as at the office's kiosk. */
 export function agentConsole(kit: Kit, def: DeskDef): DeskView {
-  const kind = def.station!;
+  // A console is a board agent's: the restroom has a table of its own.
+  const kind = def.station as BoardStationKind;
   const g = new THREE.Group();
   g.position.set(def.x, 0, def.z);
   g.rotation.y = def.rotY;

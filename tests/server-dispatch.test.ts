@@ -460,12 +460,15 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'term.input', workerId: 'nope', data: 'ls' });
   a.send({ t: 'term.typing', workerId: 'nope' });
   a.send({ t: 'term.resize', workerId: 'nope', cols: 80, rows: 24 });
-  a.send({ t: 'floor.expand' });
-  assert.equal((await a.take('plan')).plan.wing, 1);
-  assert.match(await told('🔨'), /^🔨 Eve knocked out the back wall: Desk \d+ and Desk \d+ are ready for workers$/);
-  a.send({ t: 'floor.shrink' });
-  assert.equal((await a.take('plan')).plan.wing, 0);
-  assert.match(await told('🧱'), /^🧱 Eve walled the back office back up, and Desk \d+ and Desk \d+ went with it$/);
+  // The hajzel baba hears only whoever sits on the toilet, and only on a floor with a GitHub repo, which this one isn't.
+  a.send({ t: 'station.prompt', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Sit on the toilet to tell the hajzel baba your idea');
+  a.send({ t: 'worker.spawn', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Sit on the toilet to tell the hajzel baba your idea');
+  a.send({ t: 'sit', seat: 'toilet:0' });
+  a.send({ t: 'station.prompt', deskId: 'station-restroom', prompt: 'An idea' });
+  await warned('Ideas have nowhere to go here: this floor has no GitHub repo.');
+  a.send({ t: 'sit' });
   a.send({ t: 'floor.projectsDir', dir: 'relative/dir' });
   await warned('Use a full path, like ~/Workspace');
   a.send({ t: 'floor.remove', floor: 'nope' });

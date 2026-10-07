@@ -14,7 +14,7 @@ if (remote?.kind !== 'bitbucket') {
 }
 const [ws, slug] = remote.repo.split('/');
 const repo: BbRepo = { dir, ws, slug };
-const bkt = bktIn(dir);
+const bkt = bktIn(dir, ws);
 
 const tally = (xs: unknown[]) => Object.entries(xs.reduce<Record<string, number>>((t, x) => ((t[String(x)] = (t[String(x)] ?? 0) + 1), t), {})).map(([k, n]) => `${k}=${n}`).join(' ') || '(none)';
 const keys = (o: unknown) => (o && typeof o === 'object' ? Object.keys(o).sort().join(',') : String(o));

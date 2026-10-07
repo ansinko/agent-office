@@ -81,7 +81,7 @@ export class BitbucketPulls implements CodeHost {
   constructor(
     private repo: BbRepo,
     private onPulls: (s: BoardState<Pull>) => void,
-    private bkt: Bkt = bktIn(repo.dir),
+    private bkt: Bkt = bktIn(repo.dir, repo.ws),
     private git: (args: string[]) => Promise<string> = gitIn(repo.dir),
   ) {}
 

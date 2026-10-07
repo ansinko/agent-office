@@ -24,29 +24,57 @@ test('normalizeRepo still takes owner/name and GitHub URLs only', () => {
   assert.equal(normalizeRepo('git@bitbucket.org:team/app.git'), undefined);
 });
 
-import { HOSTS } from '../src/server/hosts/registry.js';
+import { execFileSync } from 'node:child_process';
+import { HOSTS, adapterFor, hostFor } from '../src/server/hosts/registry.js';
 import { noHost } from '../src/server/hosts/none.js';
+import { JIRA_PENDING } from '../src/server/hosts/bitbucket/index.js';
+import { originRemote } from '../src/server/building.js';
 
-test('GitHub has an adapter and Bitbucket is known but unread', () => {
+test('GitHub and Bitbucket each have an adapter', () => {
   assert.equal(HOSTS.github?.name, 'GitHub');
-  assert.equal(HOSTS.bitbucket, null);
+  assert.equal(HOSTS.bitbucket?.name, 'Bitbucket');
 });
 
-test('a floor on Bitbucket or with no remote gets boards that say why, and calls nothing', async () => {
-  const bb = noHost({ kind: 'bitbucket', repo: 'team/app', url: 'https://bitbucket.org/team/app' });
-  assert.match(bb.pulls.pulls.error ?? '', /Bitbucket, which the office cannot read yet/);
-  assert.match(bb.issues.issues.error ?? '', /Bitbucket/);
-  await bb.pulls.refresh();
-  await bb.issues.refresh();
-  await assert.rejects(bb.pulls.pullDetail(1), /cannot read yet/);
-  await assert.rejects(bb.issues.issueDetail('1'), /cannot read yet/);
+test('a floor with no remote gets boards that say why, and calls nothing', async () => {
+  const none = noHost(undefined);
+  assert.match(none.pulls.pulls.error ?? '', /no remote/);
+  assert.match(none.issues.issues.error ?? '', /no remote/);
+  await none.pulls.refresh();
+  await none.issues.refresh();
+  await assert.rejects(none.pulls.pullDetail(1), /no remote/);
+  await assert.rejects(none.issues.issueDetail('1'), /no remote/);
   // What answers with an error answers with this one, so nothing waiting on it is left with a rejection.
-  assert.match((await bb.pulls.merge(1, 'squash', false, false)) ?? '', /cannot read yet/);
-  assert.match((await bb.issues.claim('1')) ?? '', /cannot read yet/);
-  assert.match((await bb.pulls.comment({ kind: 'pull', number: 1 }, 'hi')).error ?? '', /cannot read yet/);
-  assert.equal(bb.pulls.ownPr('gh pr create --fill', 'https://github.com/acme/site/pull/12'), undefined);
-  assert.match(noHost(undefined).pulls.pulls.error ?? '', /no remote/);
-  assert.match(noHost(undefined).issues.issues.error ?? '', /no remote/);
+  assert.match((await none.pulls.merge(1, 'squash', false, false)) ?? '', /no remote/);
+  assert.match((await none.issues.claim('1')) ?? '', /no remote/);
+  assert.match((await none.pulls.comment({ kind: 'pull', number: 1 }, 'hi')).error ?? '', /no remote/);
+  assert.equal(none.pulls.ownPr('gh pr create --fill', 'https://github.com/acme/site/pull/12'), undefined);
+});
+
+test('a floor on Bitbucket reads its pull requests through bkt, and its issue board waits for Jira', async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-bb-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  execFileSync('git', ['remote', 'add', 'origin', 'git@bitbucket.org:example-team/example-repo.git'], { cwd: dir });
+
+  const adapter = adapterFor(originRemote(dir))!;
+  assert.equal(adapter.kind, 'bitbucket');
+  const host = adapter.pulls(dir, () => {});
+  assert.equal((await host.repoInfo()).name, 'example-team/example-repo');
+  assert.equal((await hostFor(dir).repoInfo()).name, 'example-team/example-repo');
+
+  const tracker = adapter.issues(dir, () => {}, host);
+  assert.equal(tracker.issues.error, JIRA_PENDING);
+  await tracker.refresh();
+  assert.equal(await tracker.claim('ERN-1'), JIRA_PENDING);
+  assert.equal((await tracker.comment({ kind: 'issue', key: 'ERN-1' }, 'hi')).error, JIRA_PENDING);
+  await assert.rejects(tracker.issueDetail('ERN-1'), new RegExp(JIRA_PENDING));
+});
+
+test("the Bitbucket adapter's merge line names the strategy and the repository", () => {
+  const { cli } = HOSTS.bitbucket!;
+  assert.equal(cli.merge(5, 'squash', false, 'example-team/example-repo'), 'bkt pr merge 5 --strategy squash --close-source=false --workspace example-team --repo example-repo');
+  assert.equal(cli.merge(5, 'merge_commit', true, 'example-team/example-repo'), 'bkt pr merge 5 --strategy merge_commit --workspace example-team --repo example-repo');
+  assert.equal(cli.viewPull, 'bkt pr view {{number}}');
 });
 
 test('the GitHub adapter reads its own pull request URL off gh pr create', () => {
@@ -71,7 +99,7 @@ test("the GitHub adapter's merge line reads as the merge dialog's did", () => {
   assert.equal(cli.viewIssue, 'gh issue view {{number}} --comments');
 });
 
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 

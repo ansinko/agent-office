@@ -1,0 +1,67 @@
+{
+  "values": [
+    {
+      "type": "diffstat",
+      "lines_added": 10,
+      "lines_removed": 2,
+      "status": "modified",
+      "old": {
+        "path": "src/widget.ts",
+        "type": "commit_file",
+        "escaped_path": "src/widget.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/0123456789ab/src/widget.ts"
+          }
+        }
+      },
+      "new": {
+        "path": "src/widget.ts",
+        "type": "commit_file",
+        "escaped_path": "src/widget.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/abc123def456/src/widget.ts"
+          }
+        }
+      }
+    },
+    {
+      "type": "diffstat",
+      "lines_added": 30,
+      "lines_removed": 0,
+      "status": "added",
+      "old": null,
+      "new": {
+        "path": "src/new.ts",
+        "type": "commit_file",
+        "escaped_path": "src/new.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/abc123def456/src/new.ts"
+          }
+        }
+      }
+    },
+    {
+      "type": "diffstat",
+      "lines_added": 0,
+      "lines_removed": 8,
+      "status": "removed",
+      "old": {
+        "path": "src/old.ts",
+        "type": "commit_file",
+        "escaped_path": "src/old.ts",
+        "links": {
+          "self": {
+            "href": "https://api.bitbucket.org/2.0/repositories/example-team/example-repo/src/0123456789ab/src/old.ts"
+          }
+        }
+      },
+      "new": null
+    }
+  ],
+  "pagelen": 500,
+  "size": 3,
+  "page": 1
+}

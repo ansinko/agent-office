@@ -234,7 +234,7 @@ export class Floor {
     };
     const onIssues = (state: Tracker['issues']) => ctx.emit(this, { t: 'board.issues', state });
     const none = this.adapter ? undefined : noHost(this.remote);
-    this.host = this.adapter?.pulls(def.dir, onPulls) ?? none!.pulls;
+    this.host = this.adapter?.pulls(def.dir, onPulls, this.remote) ?? none!.pulls;
     this.tracker = this.adapter?.issues(def.dir, onIssues, this.host) ?? none!.issues;
     // The 📋 task queue seats workers by itself: it watches the workers and links PRs from the host.
     this.queue = new TaskQueue(dataDir, this.workers, !!this.project.branch, {

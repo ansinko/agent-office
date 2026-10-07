@@ -237,6 +237,17 @@ test('with GitHub every prompt renders as it did before hosts', () => {
   for (const [id, before] of Object.entries(GITHUB_BEFORE)) assert.equal(renderWithHost(id as PromptId, vars, HOSTS.github!.cli, 'GitHub'), before, id);
 });
 
+test('with Bitbucket a pull request prompt quotes bkt, never gh', () => {
+  const vars = { number: '12', title: 'T', url: 'https://bitbucket.org/example-team/example-repo/pull-requests/12', branch: 'b', base: 'main', repo: 'example-team/example-repo', merge: HOSTS.bitbucket!.cli.merge(12, 'squash', true, 'example-team/example-repo'), pr: '12' };
+  for (const id of ['pull.review', 'pull.fixMerge'] as const) {
+    const text = renderWithHost(id, vars, HOSTS.bitbucket!.cli, 'Bitbucket');
+    assert.match(text, /bkt pr view 12/, id);
+    assert.match(text, /bkt pr diff 12|bkt pr comments 12/, id);
+    assert.doesNotMatch(text, /gh /, id);
+  }
+  assert.match(renderWithHost('pull.review', vars, HOSTS.bitbucket!.cli, 'Bitbucket'), /bkt pr diff 12/);
+});
+
 test("a floor's prompts quote its own host's commands", () => {
   const cli = { ...HOSTS.github!.cli, cliName: 'bkt', listIssues: 'bkt issue list', viewIssue: 'bkt issue view {{number}}' };
   const prompts = floorPrompts({ text: (id) => PROMPTS[id].text, agent: () => undefined }, () => ({ name: 'Bitbucket', cli }));

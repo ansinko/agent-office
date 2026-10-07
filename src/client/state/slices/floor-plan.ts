@@ -3,7 +3,7 @@ import type { Slice } from '../store';
 
 declare module '../store' {
   interface Store {
-    /** The signs over the desks, and how far the back office is built out (not the map's plan: see plan()). */
+    /** The signs over the desks (not the map's plan: see plan()). */
     floorPlan: FloorPlan;
   }
   interface Topics {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BEANBAGS, DESKS, DESK_SIZE, FLOOR, KIOSK, SEATING_BY_ID, STATIONS, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../../shared/layout';
+import { BEANBAGS, DESKS, DESK_SIZE, FLOOR, KIOSK, KIOSK_STATIONS, SEATING_BY_ID, STATION_AGENT, deskSeat, type BoardStationKind, type DeskDef } from '../../../shared/layout';
 import { deskPoint } from '../../../shared/nav';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, DeskView, Interactable } from '../types';
@@ -162,7 +162,7 @@ export function buildBeanbag(def: DeskDef, index: number): DeskView {
   return { def, group, laptopAnchor, seatAnchor, stage, chair: bag, vacancy, vacancyY };
 }
 
-const KIOSK_SIGN: Record<StationKind, string> = { issues: '📌 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
+const KIOSK_SIGN: Record<BoardStationKind, string> = { issues: '📌 Ask me', pulls: '🔀 Ask me', queue: '📋 Ask me' };
 
 /**
  * A board agent's kiosk: a little counter in its color with a sign on the front, and the agent standing
@@ -170,7 +170,8 @@ const KIOSK_SIGN: Record<StationKind, string> = { issues: '📌 Ask me', pulls: 
  * one there), in the same spot and pose as the one who gets hired.
  */
 export function buildKiosk(def: DeskDef): DeskView {
-  const kind = def.station!;
+  // A kiosk is a board agent's: the restroom has a table of its own.
+  const kind = def.station as BoardStationKind;
   const group = new THREE.Group();
   group.position.set(def.x, 0, def.z);
   group.rotation.y = def.rotY;
@@ -276,7 +277,7 @@ export const beanbags: Fixture<'setBeanbags'> = (site) => {
 
 /** The board agents' kiosks, each just west of its board. */
 export const kiosks: Fixture = (site) => {
-  for (const def of STATIONS) {
+  for (const def of KIOSK_STATIONS) {
     const view = buildKiosk(def);
     site.group.add(view.group);
     site.desks.set(def.id, view);

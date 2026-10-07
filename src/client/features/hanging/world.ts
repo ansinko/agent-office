@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { FRAMES, FRAME_BORDER, WALLS, frameRect, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
-import { FLOOR, LOFT } from '../../../shared/layout';
+import { FRAMES, FRAME_BORDER, frameRect, wallPose, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
 import { isWallUrl } from '../../../shared/wall';
 import type { Interactable } from '../../world/types';
 import { toon } from '../../world/toon';
+
+export { aimAtWall } from '../../../shared/walls';
 
 // ---- Pictures -------------------------------------------------------------------------------------
 
@@ -339,35 +340,4 @@ export class Ghost {
     this.body = null;
     this.key = '';
   }
-}
-
-/** Where a ray from inside the room first meets a wall, within `maxDist` meters (the whole room by default). */
-export function aimAtWall(ray: THREE.Ray, maxDist = 60): { wall: WallId; u: number; y: number } | null {
-  const o = ray.origin;
-  const d = ray.direction;
-  // Only from inside: out on the balcony or down on the street, the walls face the other way.
-  if (o.x < FLOOR.minX || o.x > FLOOR.maxX || o.z < FLOOR.minZ || o.z > FLOOR.maxZ || o.y < 0) return null;
-  // The loft's floor hides whatever is past it, from above or below.
-  if (d.y !== 0) {
-    const t = (LOFT.y - 0.12 - o.y) / d.y;
-    const x = o.x + d.x * t;
-    const z = o.z + d.z * t;
-    if (t > 0 && x > LOFT.minX && x < LOFT.maxX && z > LOFT.minZ && z < LOFT.maxZ) maxDist = Math.min(maxDist, t);
-  }
-  const hits: [WallId, number][] = [];
-  if (d.z < 0) hits.push(['north', (FLOOR.minZ - o.z) / d.z]);
-  if (d.z > 0) hits.push(['south', (FLOOR.maxZ - o.z) / d.z]);
-  if (d.x < 0) hits.push(['west', (FLOOR.minX - o.x) / d.x]);
-  if (d.x > 0) hits.push(['east', (FLOOR.maxX - o.x) / d.x]);
-  let best: { wall: WallId; u: number; y: number } | null = null;
-  let bestT = maxDist;
-  for (const [wall, t] of hits) {
-    if (!(t > 0 && t < bestT)) continue;
-    const y = o.y + d.y * t;
-    const u = wall === 'north' || wall === 'south' ? o.x + d.x * t : o.z + d.z * t;
-    if (y < 0 || u < WALLS[wall].min || u > WALLS[wall].max || y > wallTop(wall, u)) continue;
-    best = { wall, u, y };
-    bestT = t;
-  }
-  return best;
 }

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { DESK_BY_ID, FLOOR, KIOSK, type DeskDef } from '../shared/layout.js';
+import { DESK_BY_ID, FLOOR, KIOSK, WING, type DeskDef } from '../shared/layout.js';
 import { DOG_BREEDS, DOG_COATS, cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBreed, type DogState } from '../shared/dog.js';
 import { deskPoint, nearestWalkable, route, walkable, type Pt } from '../shared/nav.js';
 import type { PeerInfo, WorkerInfo } from '../shared/protocol.js';
@@ -40,8 +40,6 @@ export interface DogEnv {
   people(): PeerInfo[];
   /** To everyone on this floor. */
   send(dog: DogState): void;
-  /** How many rows the floor's back office is built out, for getting round its desks too (see WING). */
-  wing?(): number;
 }
 
 type Leg = Omit<DogState, 'name' | 'coat' | 'breed' | 'elapsed'> & { start: number };
@@ -254,9 +252,9 @@ export class Dog {
     return best;
   }
 
-  /** How far the floor's back office is built out. */
+  /** The floor's back office, the restroom, which it gets round too (see WING). */
   private get wing(): number {
-    return this.env.wing?.() ?? 0;
+    return WING.rows;
   }
 
   /** Picks what to do next. */

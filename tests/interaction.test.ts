@@ -42,6 +42,5 @@ test('L hangs a sign over any desk, empty or not, but not over a bean bag or a m
   assert.equal(interactionAvailable(interaction('desk', { deskId: 'desk-1' }), 'L', state({ worker })), true);
   assert.equal(interactionAvailable(interaction('desk', { deskId: 'beanbag-1' }), 'L', state()), false);
   assert.equal(interactionAvailable(interaction('desk', { deskId: 'meeting-1' }), 'L', state({ room: true })), false);
-  assert.equal(interactionAvailable(interaction('expand'), 'E', state()), true);
   assert.equal(interactionAvailable(null, 'L', state()), false);
 });

@@ -3,6 +3,7 @@
  * own (the castle). Only one is in the scene at a time, like the office and the rooftop; core/maps.ts
  * puts up the one the building's on.
  */
+import { WING } from '../../shared/layout';
 import type { MapPlan } from '../../shared/maps';
 import { ROOF } from '../../shared/rooftop';
 import { groundAt } from '../player';
@@ -67,11 +68,11 @@ export function createWorlds(ctx: Ctx) {
   }
 
   /**
-   * How many rows the office's back office is built out where you are: the floor's plan in the office,
+   * How many rows the office's back office is built out where you are: WING.rows on an office floor,
    * none on the roof or on a map of its own (its hall is its own shape).
    */
   function officeWing(): number {
-    return inOffice() && store.floor !== ROOF ? store.floorPlan.wing : 0;
+    return inOffice() && store.floor !== ROOF ? WING.rows : 0;
   }
 
   /** The top of whatever's underfoot at (x, z) for feet at `y`, in the world you're in: its floor, a step, the street. */

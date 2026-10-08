@@ -146,3 +146,24 @@ test('the command can lay the board out in columns of its own', async (t) => {
   await tracker.refresh();
   assert.equal(tracker.issues.columns, undefined);
 });
+
+test("an issue's files are read through the show command, and only the ones it lists", async (t) => {
+  const dir = folder(t);
+  const show = path.join(dir, 'show.mjs');
+  writeFileSync(show, 'process.stdout.write("# file " + process.argv.at(-1))');
+  const files = [{ id: 'origin/main:modules/a.md', title: 'Otázky', url: 'https://bitbucket.org/a/b/src/main/modules/a.md' }, { id: '-x', title: 'flag' }, { id: 'b.md', title: '' }, { id: 'origin/main:modules/a.md', title: 'twice' }];
+  printing(dir, [{ key: 'I16-W5', title: 'W5', files }], { show: [process.execPath, show] });
+  const tracker = commandTracker(dir, dir, () => {})!.tracker;
+  await tracker.refresh();
+  assert.deepEqual(tracker.issues.items[0].files, [files[0]]);
+  assert.equal(await tracker.file!('I16-W5', 'origin/main:modules/a.md'), '# file origin/main:modules/a.md');
+  await assert.rejects(tracker.file!('I16-W5', 'origin/main:modules/other.md'), /has no file/);
+  await assert.rejects(tracker.file!('I16-W6', 'origin/main:modules/a.md'), /has no file/);
+
+  printing(dir, [{ key: 'I16-W5', title: 'W5', files }]);
+  const plain = commandTracker(dir, dir, () => {})!.tracker;
+  await plain.refresh();
+  await assert.rejects(plain.file!('I16-W5', 'origin/main:modules/a.md'), /no "show" command/);
+  writeFileSync(path.join(dir, 'tracker.json'), JSON.stringify({ command: ['node'], show: 'node show.mjs' }));
+  assert.match(commandTracker(dir, dir, () => {})!.tracker.issues.error ?? '', /"show" must be a list/);
+});

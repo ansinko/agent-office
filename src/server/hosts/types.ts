@@ -67,6 +67,8 @@ export interface Tracker {
   repoLabels(): Promise<Label[]>;
   setLabels(key: string, add: string[], remove: string[], as?: HostAs): Promise<{ labels?: Label[]; error?: string }>;
   claim(key: string, as?: HostAs): Promise<string | undefined>;
+  /** The text of one of an issue's files (Issue.files), for a tracker whose issues have them. */
+  file?(key: string, id: string): Promise<string>;
 }
 
 export interface HostAdapter {

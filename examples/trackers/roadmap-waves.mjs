@@ -48,6 +48,15 @@ function fail(why) {
 const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trimEnd();
 const lines = (s) => (s ? s.split('\n') : []);
 
+// --show <ref>:<path> prints one of a card's files from the spec repository: the tracker's "show".
+if (argv.includes('--show')) {
+  const id = option('--show') ?? '';
+  const m = /^((?:origin\/)?[\w./-]+):(modules\/[^\0\s]+\.md)$/.exec(id);
+  if (!m || m[1].startsWith('-') || m[2].split('/').includes('..')) fail(`Not a file of this tracker: ${id}`);
+  process.stdout.write(git(spec, 'show', `${m[1]}:${m[2]}`));
+  process.exit(0);
+}
+
 if (!argv.includes('--no-fetch')) for (const dir of [code, spec]) git(dir, 'fetch', '--prune', '--quiet', 'origin');
 
 const codeFiles = lines(git(code, 'ls-tree', '-r', '--name-only', 'origin/main'));
@@ -180,10 +189,29 @@ function specDoc(file) {
 }
 
 /** What a wave's tickets say, and their test scenarios, as Markdown for its card. */
+/** One of a card's files: the spec file `file` at branch `ref`, to read in the issue window. */
+const fileAt = (title, file, ref = 'origin/main') => ({ id: `${ref}:${file}`, title, ...(ref.startsWith('origin/') ? { url: specPageOf(file, short(ref)) } : {}) });
+
+/** A wave's questions, then each ticket and its test scenarios, as files of its card. */
+function filesOf(module, wave, questions) {
+  const files = questions.map((q) => fileAt(`Otázky · ${path.basename(q.file)} (${q.stav})`, q.file, q.branch));
+  for (const nn of wave.tickets) {
+    const ticket = ticketFile(module, nn);
+    if (!ticket) continue;
+    files.push(fileAt(`Tiket ${nn} · ${path.basename(ticket)}`, ticket));
+    const scenarios = scenariosFile(ticket);
+    if (scenarios) files.push(fileAt(`Test scenáre ${nn} · ${path.basename(scenarios)}`, scenarios));
+  }
+  return files;
+}
+
+const ticketFile = (module, nn) => specFiles.find((f) => new RegExp(`^modules/[^/]+/${module.slug}/tickets/${nn}-[^/]+/${nn}-[^/]+\\.md$`).test(f));
+const scenariosFile = (ticket) => specFiles.find((f) => f.startsWith(`${path.dirname(ticket)}/test-scenarios/`) && f.endsWith('.md'));
+
 function ticketsOf(module, wave) {
   const out = [];
   for (const nn of wave.tickets) {
-    const ticket = specFiles.find((f) => new RegExp(`^modules/[^/]+/${module.slug}/tickets/${nn}-[^/]+/${nn}-[^/]+\\.md$`).test(f));
+    const ticket = ticketFile(module, nn);
     if (!ticket) {
       out.push(`#### Tiket ${nn}`, '', '_V spec main nie je._', '');
       continue;
@@ -192,7 +220,7 @@ function ticketsOf(module, wave) {
     const title = /^# (.*)$/m.exec(rest)?.[1] ?? `${nn} — ${fields.nazov ?? ''}`;
     const what = rest.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !p.startsWith('#')) ?? '';
     out.push(`#### [${title}](${specPageOf(ticket, 'main')})`, '', `stav \`${fields.stav ?? '?'}\` · blokovaný kým ${fields.blokovany_kym ?? '-'} · nedoriešené ${fields.nedoriesene ?? '-'}`, '', what.length > 900 ? `${what.slice(0, 900)}…` : what, '');
-    const scenarios = specFiles.find((f) => f.startsWith(`${path.dirname(ticket)}/test-scenarios/`) && f.endsWith('.md'));
+    const scenarios = scenariosFile(ticket);
     if (scenarios) {
       const doc = specDoc(scenarios);
       const count = (level) => (doc.rest.match(new RegExp(`^#+ TS-${nn}-${level}-`, 'gm')) ?? []).length;
@@ -327,6 +355,7 @@ for (const module of roadmaps()) {
       labels: [moduleLabel, ...distinct(moduleQs.map((q) => (q.stav === 'premietnute' ? { name: 'premietnuté, čaká na merge', color: '#9a6700' } : stavLabel(q.stav))))],
       createdAt: roadmapAt,
       updatedAt: roadmapAt,
+      files: moduleQs.map((q) => fileAt(`Otázky · ${path.basename(q.file)} (${q.stav})`, q.file, q.branch)),
       body: [`**${module.name}** · otázky k roadmapu a špecifikácii, ktoré nepatria žiadnej vlne`, '', ...moduleQs.map((q) => `- [${path.basename(q.file)}](${specPageOf(q.file, q.branch ? short(q.branch) : 'main')}) (${q.stav})${where(q)}`)].join('\n'),
     });
   }
@@ -371,6 +400,7 @@ for (const module of roadmaps()) {
         ...(wave.tickets.length ? ['', '### Tikety', '', ...ticketsOf(module, wave)] : []),
       ].join('\n'),
       ...(prompt ? { prompt } : {}),
+      files: filesOf(module, wave, place.questions ?? []),
     });
   }
 }

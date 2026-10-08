@@ -89,3 +89,7 @@ article.gh-card > header { display: flex; align-items: center; gap: 8px; padding
 /* .modal.gh-labeler outranks the frame's .modal footer .grow, whatever order the sheets load in. */
 .modal.gh-labeler footer .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .gh-labeler .gh-quiet a { color: #1d6fd6; font-weight: 800; }
+/* An issue's files (issue-files.ts): their list, and one of them read in place of the conversation. */
+.gh-file-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gh-file-bar .grow { flex: 1; min-width: 0; }
+.gh-file { text-align: left; }

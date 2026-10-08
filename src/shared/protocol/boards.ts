@@ -37,6 +37,15 @@ export interface Issue {
   prompt?: string;
   /** Which of the board's own columns it goes in (BoardState.columns' key). */
   column?: string;
+  /** Files that go with it, which the issue window shows on request (GET /api/board/issue/file). */
+  files?: IssueFile[];
+}
+
+/** A Markdown file that goes with an issue: what the tracker calls it, and its page, if it has one. */
+export interface IssueFile {
+  id: string;
+  title: string;
+  url?: string;
 }
 
 /** A column of the issues board that the tracker lays out itself. */

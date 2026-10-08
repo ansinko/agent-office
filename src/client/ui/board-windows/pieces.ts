@@ -8,6 +8,9 @@ import { markdown } from '../markdown';
 /** What the floor's code host is called, for "Open on GitHub" and the load errors. */
 export const hostName = (floor = store.currentFloor()) => floor?.host?.name ?? 'GitHub';
 
+/** What the floor's issues come from: its host, or a command tracker of its own. */
+export const trackerName = (floor = store.currentFloor()) => floor?.tracker?.name ?? hostName(floor);
+
 export function avatar(name: string) {
   let x = 0;
   for (const ch of name) x = (x * 31 + ch.charCodeAt(0)) | 0;

@@ -54,7 +54,7 @@ On the machine that runs the office:
 - **Node.js 20+**
 - At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`, 0.87.1+) or the **Cursor** CLI (`cursor-agent`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
 - **git**, and the **GitHub CLI** (`gh auth login`) for cloning repos and the issue and PR boards
-- For a project on bitbucket.org, the **Bitbucket CLI** (`bkt auth login --kind cloud`): its PR board reads and writes through `bkt`, and its issues board waits for Jira. With that login the office adds a `bkt` context named `office-<workspace>` for each Bitbucket workspace it reads; with `BKT_HOST` and `BKT_TOKEN` set it uses those instead
+- For a project on bitbucket.org, the **Bitbucket CLI** (`bkt auth login --kind cloud`): its PR board reads and writes through `bkt`, and its issues board waits for Jira, or lists what a command of your own prints (see [The issues board from a command of your own](docs/configuration.md#the-issues-board-from-a-command-of-your-own)). With that login the office adds a `bkt` context named `office-<workspace>` for each Bitbucket workspace it reads; with `BKT_HOST` and `BKT_TOKEN` set it uses those instead
 
 ## Run locally
 

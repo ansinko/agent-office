@@ -51,7 +51,7 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
     h(
       'footer',
       {},
-      h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`),
+      it.url ? h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`) : h('span.grow'),
       h('button.btn', { type: 'button', title: 'Send a worker your own prompt about this issue', onclick: () => actions.ask(issueContext(it), `Ask about issue ${it.ref}`) }, '✍️ Ask a worker…'),
       h('button.btn', { type: 'button', title: 'Workers take it on together in the meeting room: a debate, lead & team, map-reduce or red / blue', onclick: () => actions.meeting(issueMeeting(it.key, it.title)) }, '🤝 Meeting…'),
       closeIssue,
@@ -70,14 +70,16 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
         h('span', {}, `opened this ${timeAgo(it.createdAt)}`),
         it.assignees.length ? h('span', {}, `· 👤 ${it.assignees.join(', ')}`) : it.taken ? h('span', {}, '· 🤖 handed to a worker') : null,
         ...it.labels.map(labelChip),
-        labelButton('issue', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame()), detail?.caps),
+        detail?.readOnly ? null : labelButton('issue', () => it, net, (labels) => ((it = { ...it, labels }), renderFrame()), detail?.caps),
       ),
     );
     pill.className = `pill ${isOpen ? 'done' : 'offline'}`;
     pill.textContent = isOpen ? 'open' : 'closed';
     const task = store.taskForIssue(it.key);
     const onQueue = !!task && task.status !== 'done';
-    closeIssue.classList.toggle('hidden', !isOpen);
+    const readOnly = !!detail?.readOnly;
+    closeIssue.classList.toggle('hidden', !isOpen || readOnly);
+    comment.el.classList.toggle('hidden', readOnly);
     pickUp?.classList.toggle('hidden', !isOpen);
     queueProvider.element.classList.toggle('hidden', !isOpen || onQueue);
     queue.classList.toggle('hidden', !isOpen);
@@ -89,7 +91,7 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
     thread.replaceChildren(commentCard({ id: 'body', author: it.author, body: detail?.body ?? it.body, createdAt: it.createdAt, url: it.url }, itemUrl, 'opened this'));
     if (error) thread.append(errorBox(error, load));
     else if (!detail) thread.append(spinnerRow('Loading comments…'));
-    else if (!detail.comments.length) thread.append(h('p.gh-quiet', {}, 'No comments yet.'));
+    else if (!detail.comments.length && !detail.readOnly) thread.append(h('p.gh-quiet', {}, 'No comments yet.'));
     else thread.append(...detail.comments.map((c) => commentCard(c, itemUrl, 'commented')));
   };
   let generation = 0;

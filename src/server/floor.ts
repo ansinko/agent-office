@@ -10,6 +10,7 @@ import { WorkerManager, workedMs, type HookEnv, type RunAs } from './workers.js'
 import { originRemote, type FloorDef } from './building.js';
 import { adapterFor } from './hosts/registry.js';
 import { noHost } from './hosts/none.js';
+import { commandTracker } from './hosts/command/index.js';
 import { MergeWatch } from './hosts/watch.js';
 import type { CodeHost, HostAdapter, HostAs, Tracker } from './hosts/types.js';
 import { HOST_NAMES, commandsOf, type Remote } from '../shared/hosts.js';
@@ -122,6 +123,8 @@ export class Floor {
   /** Its pull requests, and its issues. */
   readonly host: CodeHost;
   readonly tracker: Tracker;
+  /** What its own command tracker is called, when .agent-office/tracker.json gives it one. */
+  private readonly trackerName?: string;
   readonly queue: TaskQueue;
   readonly changes: Changes;
   readonly decor: Decor;
@@ -235,7 +238,9 @@ export class Floor {
     const onIssues = (state: Tracker['issues']) => ctx.emit(this, { t: 'board.issues', state });
     const none = this.adapter ? undefined : noHost(this.remote);
     this.host = this.adapter?.pulls(def.dir, onPulls, this.remote) ?? none!.pulls;
-    this.tracker = this.adapter?.issues(def.dir, onIssues, this.host) ?? none!.issues;
+    const own = commandTracker(def.dir, dataDir, onIssues);
+    this.trackerName = own?.name;
+    this.tracker = own?.tracker ?? this.adapter?.issues(def.dir, onIssues, this.host) ?? none!.issues;
     // The 📋 task queue seats workers by itself: it watches the workers and links PRs from the host.
     this.queue = new TaskQueue(dataDir, this.workers, !!this.project.branch, {
       update: (state) => {
@@ -415,7 +420,7 @@ export class Floor {
       name: this.def.name,
       repo: this.def.repo,
       host: r && name ? { kind: r.kind, name, repo: r.repo, url: r.url, ...(this.adapter ? { cli: commandsOf(this.adapter.cli) } : {}) } : null,
-      tracker: r && name ? { kind: r.kind, name } : null,
+      tracker: this.trackerName ? { kind: 'command', name: this.trackerName } : r && name ? { kind: r.kind, name } : null,
       dir: this.dir,
       branch: this.project.branch,
       palette: this.def.palette,

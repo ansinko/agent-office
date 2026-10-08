@@ -33,6 +33,8 @@ export interface Issue {
   updatedAt: string;
   body: string;
   comments: number;
+  /** The task a worker gets for it, when the tracker says what that is (a command tracker's own prompt). */
+  prompt?: string;
 }
 
 export interface Pull {
@@ -154,6 +156,8 @@ export interface IssueDetail {
   /** Why the tracker lets an issue close. */
   reasons: Choice[];
   caps: Pick<HostCaps, 'labels'>;
+  /** The tracker only lists it: nobody comments on it, closes it or labels it from the office. */
+  readOnly?: boolean;
 }
 
 /** GitHub turns away comments longer than this. */
@@ -161,10 +165,10 @@ export const COMMENT_MAX = 65536;
 /** Longer than any label name: GitHub stops at 50 characters, and JS counts an emoji as two. */
 export const LABEL_MAX = 100;
 
-/** An issue's key from what was sent: a GitHub issue number (12, "12", "#12") or a tracker key like ERN-123. */
+/** An issue's key from what was sent: a GitHub issue number (12, "12", "#12") or a tracker key like ERN-123 or I16-W3B. */
 export const issueKey = (v: unknown): string | undefined => {
   const s = typeof v === 'number' && Number.isInteger(v) && v > 0 ? String(v) : typeof v === 'string' ? v.trim().replace(/^#/, '') : '';
-  return /^(?:[1-9]\d{0,9}|[A-Z][A-Z0-9_]{0,19}-[1-9]\d{0,9})$/.test(s) ? s : undefined;
+  return /^(?:[1-9]\d{0,9}|[A-Z][A-Z0-9_]{0,19}-[A-Z0-9]{1,12})$/.test(s) ? s : undefined;
 };
 
 /** How an issue is named in a sentence: #12 for a GitHub issue, a tracker's key (ERN-123) as it is. */

@@ -21,9 +21,9 @@ export interface BoardActions {
   meeting(preset: MeetingPreset): void;
 }
 
-/** The task a worker gets for an issue, from the board, a carried card or the queue (the 'issue.work' prompt). */
-export function issuePrompt(it: Pick<Issue, 'key' | 'title'> & { url?: string }): string {
-  return officePrompt('issue.work', issueVars(it));
+/** The task a worker gets for an issue, from the board, a carried card or the queue: the tracker's own, else the 'issue.work' prompt. */
+export function issuePrompt(it: Pick<Issue, 'key' | 'title'> & { url?: string; prompt?: string }): string {
+  return it.prompt ?? store.issues.items.find((i) => i.key === it.key)?.prompt ?? officePrompt('issue.work', issueVars(it));
 }
 
 /** What an issue's prompts fill in ({{number}} is its key). A carried card has no URL, but the board usually knows it. */

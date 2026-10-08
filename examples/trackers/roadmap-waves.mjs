@@ -45,7 +45,7 @@ function fail(why) {
   process.exit(1);
 }
 
-const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trimEnd();
+const git = (dir, ...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trimEnd();
 const lines = (s) => (s ? s.split('\n') : []);
 
 if (!argv.includes('--no-fetch')) for (const dir of [code, spec]) git(dir, 'fetch', '--prune', '--quiet', 'origin');
@@ -55,14 +55,13 @@ const specFiles = lines(git(spec, 'ls-tree', '-r', '--name-only', 'origin/main')
 const refs = (dir, prefix, merged) => lines(git(dir, 'for-each-ref', `--${merged ? '' : 'no-'}merged`, 'origin/main', '--format=%(refname:short)', `refs/remotes/origin/${prefix}`)).filter((r) => r !== 'origin/HEAD' && r !== 'origin');
 const featuresMerged = refs(code, 'feature/', true);
 const featuresOpen = refs(code, 'feature/', false);
-/** Plan branches only in the spec checkout: prepare-wave ran there, but nobody pushed its questions. */
+/** Plan branches only in the spec checkout: prepare-wave ran there, and no branch on origin has them. */
 const unpushed = new Set(
-  lines(git(spec, 'for-each-ref', '--no-merged', 'origin/main', '--format=%(refname:short)%09%(upstream:short)%09%(upstream:track)', 'refs/heads/plan/'))
-    .map((l) => l.split('\t'))
-    .filter(([, upstream, track]) => !upstream || track === '[gone]')
-    .map(([name]) => name),
+  lines(git(spec, 'for-each-ref', '--no-merged', 'origin/main', '--format=%(refname:short)', 'refs/heads/plan/')).filter((b) => !git(spec, 'branch', '-r', '--contains', b)),
 );
 const plansOpen = [...refs(spec, 'plan/', false), ...unpushed];
+/** The spec repository's other unmerged branches, such as spec/<module>, where plan branches are merged before main. */
+const specOpen = refs(spec, '', false).filter((b) => !b.startsWith('origin/plan/'));
 const unmergedCode = refs(code, '', false);
 
 /**
@@ -82,7 +81,7 @@ function mineFrom(email) {
     }
   };
   for (const b of unmergedCode) touched(code, b, /^(?:docs\/plans|platform\/backend\/src\/services|modules)\/([^/]+)\//);
-  for (const b of plansOpen) touched(spec, b, /^modules\/[^/]+\/([^/]+)\//);
+  for (const b of [...plansOpen, ...specOpen]) touched(spec, b, /^modules\/[^/]+\/([^/]+)\//);
   return found;
 }
 
@@ -223,17 +222,36 @@ function stavOf(file, ref = 'origin/main') {
 }
 
 /** The module's questions files on the spec repository's main whose name ends in `<suffix>.md`. */
-const questionsOnMain = (module, suffix) =>
-  specFiles.filter((f) => {
-    const m = /^modules\/[^/]+\/([^/]+)\/questions\/(v[^/]*)\.md$/.exec(f);
-    return m?.[1] === module.slug && m[2].endsWith(suffix);
-  });
+const questionsOnMain = (module, suffix) => specFiles.filter((f) => questionsOnMain.test(module, suffix, f));
+questionsOnMain.test = (module, suffix, f) => {
+  const m = /^modules\/[^/]+\/([^/]+)\/questions\/(v[^/]*)\.md$/.exec(f);
+  return m?.[1] === module.slug && m[2].endsWith(suffix);
+};
 
-/** The questions files an unmerged plan branch brings, with their stav there. */
-function planQuestions(branch) {
-  return lines(git(spec, 'diff', '--name-only', `origin/main...${branch}`))
-    .filter((f) => /\/questions\/v[^/]*\.md$/.test(f))
-    .map((f) => ({ file: f, stav: stavOf(f, branch) }));
+/** How far a questions file has got, so the furthest copy of it on any branch wins. */
+const STAGE = ['na-zodpovedanie', 'čiastočne-zodpovedané', 'zodpovedane', 'premietnute'];
+
+/**
+ * Every questions file an unmerged spec branch changes, at the stage its furthest branch has it
+ * (`branch`), or main's when no branch changes it (`branch` undefined).
+ */
+const allQuestions = (() => {
+  const best = new Map();
+  for (const branch of [...plansOpen, ...specOpen]) {
+    for (const file of lines(git(spec, 'diff', '--name-only', `origin/main...${branch}`)).filter((f) => /\/questions\/v[^/]*\.md$/.test(f))) {
+      if (!specFiles.includes(file) && !git(spec, 'ls-tree', '--name-only', branch, file)) continue;
+      const stav = stavOf(file, branch);
+      const had = best.get(file);
+      if (!had || STAGE.indexOf(stav) > STAGE.indexOf(had.stav)) best.set(file, { file, stav, branch });
+    }
+  }
+  return best;
+})();
+
+/** The module's questions files whose name ends in `<suffix>.md`: their furthest copy on a branch, else main's. */
+function questionsOf(module, suffix) {
+  const files = new Set([...questionsOnMain(module, suffix), ...[...allQuestions.keys()].filter((f) => questionsOnMain.test(module, suffix, f))]);
+  return [...files].map((file) => allQuestions.get(file) ?? { file, stav: stavOf(file) });
 }
 
 const ownBranch = (module, wave) => (b) => b.includes(`${module.slug}-${wave.id.toLowerCase()}-`);
@@ -267,9 +285,9 @@ function placeOf(module, wave) {
   const branch = featuresOpen.find(mine);
   if (branch) return { column: 'progress', branch, labels: [] };
   const plan = plansOpen.find(mine);
-  const onMain = questionsOnMain(module, `-otazky-implementacny-plan-${wave.id.toLowerCase()}`).map((file) => ({ file, stav: stavOf(file) }));
-  const questions = [...(plan ? planQuestions(plan) : []), ...onMain];
+  const questions = questionsOf(module, `-otazky-implementacny-plan-${wave.id.toLowerCase()}`);
   const unanswered = questions.filter((q) => q.stav !== 'premietnute');
+  const unmerged = [...new Set(questions.filter((q) => q.branch).map((q) => short(q.branch)))];
   const blockers = wave.deps.filter((d) => {
     const dep = module.waves.find((x) => x.id === d);
     return !dep || !done(module, dep);
@@ -277,6 +295,7 @@ function placeOf(module, wave) {
   const after = blockers.length ? [{ name: `po ${blockers.join(', ')}`, color: '#6e7781' }] : [];
   const local = plan && unpushed.has(plan) ? [{ name: 'otázky nepushnuté', color: '#bc4c00' }] : [];
   if (plan || unanswered.length) return { column: 'waiting', plan, questions, labels: [...local, ...distinct(unanswered.map((q) => stavLabel(q.stav))), ...after] };
+  if (unmerged.length) return { column: 'waiting', questions, labels: [{ name: `premietnuté v ${unmerged.join(', ')}, čaká na merge`, color: '#9a6700' }, ...after] };
   if (wave.ref !== 'origin/main') return { column: 'not-started', questions, labels: [{ name: 'roadmap nie je v main', color: '#bc4c00' }] };
   if (questions.length) return { column: 'ready', questions, labels: [stavLabel('premietnute'), ...after] };
   if (blockers.length) return { column: 'not-started', labels: [{ name: `blokovaná: ${blockers.join(', ')}`, color: '#cf222e' }] };
@@ -284,6 +303,8 @@ function placeOf(module, wave) {
 }
 
 const short = (ref) => ref.replace(/^origin\//, '');
+/** Where a questions file stands, if not on main. */
+const where = (q) => (!q.branch ? '' : unpushed.has(q.branch) ? ` na lokálnej \`${q.branch}\` (nepushnutá)` : ` na \`${short(q.branch)}\``);
 const issues = [];
 
 for (const module of roadmaps()) {
@@ -291,23 +312,22 @@ for (const module of roadmaps()) {
   const roadmapAt = git(code, 'log', '-1', '--format=%cI', module.ref, '--', module.file);
   const url = pageOf(module.file, short(module.ref));
 
-  // The module's questions about its roadmap, while they wait.
-  const roadmapQs = [
-    ...plansOpen.filter((b) => b.includes(module.slug)).flatMap((b) => planQuestions(b).filter((q) => /-otazky-implementacna-roadmapa\.md$/.test(q.file)).map((q) => ({ ...q, plan: b }))),
-    ...questionsOnMain(module, '-otazky-implementacna-roadmapa').map((file) => ({ file, stav: stavOf(file) })),
-  ].filter((q) => q.stav !== 'premietnute');
-  if (roadmapQs.length) {
+  // The module's questions that belong to no wave (its roadmap, its specification), while they wait.
+  const waveQs = /-otazky-implementacny-plan-w\d+[a-z]?$/;
+  const moduleQs = [...questionsOf(module, '-otazky-implementacna-roadmapa'), ...questionsOf(module, '').filter((q) => q.branch && !waveQs.test(q.file.replace(/\.md$/, '')))]
+    .filter((q, i, all) => (q.stav !== 'premietnute' || q.branch) && all.findIndex((x) => x.file === q.file) === i);
+  if (moduleQs.length) {
     issues.push({
-      key: `${module.prefix}-ROADMAP`,
-      ref: `${module.name} roadmap`,
-      title: `${module.name} roadmap: otázky k roadmapu čakajú`,
+      key: `${module.prefix}-OTAZKY`,
+      ref: `${module.name} otázky`,
+      title: `${module.name}: otázky mimo vĺn čakajú (${moduleQs.length})`,
       url,
       author: module.slug,
       column: 'waiting',
-      labels: [moduleLabel, ...distinct(roadmapQs.map((q) => stavLabel(q.stav)))],
+      labels: [moduleLabel, ...distinct(moduleQs.map((q) => (q.stav === 'premietnute' ? { name: 'premietnuté, čaká na merge', color: '#9a6700' } : stavLabel(q.stav))))],
       createdAt: roadmapAt,
       updatedAt: roadmapAt,
-      body: [`**${module.name}** · otázky k roadmapu \`${module.file}\``, '', ...roadmapQs.map((q) => `- \`${q.file}\` (${q.stav})${q.plan ? ` na \`${short(q.plan)}\`` : ''}`)].join('\n'),
+      body: [`**${module.name}** · otázky k roadmapu a špecifikácii, ktoré nepatria žiadnej vlne`, '', ...moduleQs.map((q) => `- [${path.basename(q.file)}](${specPageOf(q.file, q.branch ? short(q.branch) : 'main')}) (${q.stav})${where(q)}`)].join('\n'),
     });
   }
 
@@ -346,7 +366,7 @@ for (const module of roadmaps()) {
         `- Roadmap: \`${wave.file}\`${wave.ref === 'origin/main' ? '' : ` na \`${short(wave.ref)}\``}`,
         ...(place.branch ? [`- Branch: \`${short(place.branch)}\``] : []),
         ...(place.plan ? [`- Questions on: \`${short(place.plan)}\` (spec)`] : []),
-        ...(place.questions ?? []).map((q) => `- Questions: \`${q.file}\` (${q.stav})`),
+        ...(place.questions ?? []).map((q) => `- Questions: [${path.basename(q.file)}](${specPageOf(q.file, q.branch ? short(q.branch) : 'main')}) (${q.stav})${where(q)}`),
         ...(wave.text ? ['', '### Z roadmapu', '', wave.text.length > 5000 ? `${wave.text.slice(0, 5000)}…` : wave.text] : []),
         ...(wave.tickets.length ? ['', '### Tikety', '', ...ticketsOf(module, wave)] : []),
       ].join('\n'),

@@ -67,6 +67,8 @@ test('what the command prints becomes the board, its junk dropped', () => {
   assert.equal(w1.state, 'closed');
   assert.equal(w1.prompt, undefined);
   assert.throws(() => issuesOf('{"nope":1}'), /no list of issues/);
+  const [long] = issuesOf(JSON.stringify([{ key: 'I16-W5', title: 'W5', body: 'x'.repeat(20_000) }]));
+  assert.equal(long.body.length, 16_000);
 });
 
 test('the board lists what the command prints, and only lists', async (t) => {

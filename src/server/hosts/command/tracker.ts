@@ -23,6 +23,8 @@ const MAX_ISSUES = 500;
 /** A worker's claim shows on the board for this long, unless the list has the issue taken by then. */
 const CLAIM_MS = 6 * 60 * 60 * 1000;
 const GREY = '#8b949e';
+/** Its own text is all the issue window has to show, so it may run longer than a host's list does. */
+const BODY_MAX = 16_000;
 
 /**
  * The floor's command tracker, from `<dataDir>/tracker.json`: undefined when there's no such file.
@@ -76,7 +78,7 @@ export function issueOf(v: unknown): Issue | undefined {
     assignees: (Array.isArray(i.assignees) ? i.assignees : []).filter((a): a is string => typeof a === 'string' && !!a).map((a) => a.slice(0, 100)),
     createdAt: str(i.createdAt, 40) || now,
     updatedAt: str(i.updatedAt, 40) || str(i.createdAt, 40) || now,
-    body: str(i.body, 4000),
+    body: str(i.body, BODY_MAX),
     comments: 0,
     ...(typeof i.prompt === 'string' && i.prompt.trim() ? { prompt: i.prompt.slice(0, 20_000) } : {}),
     ...(typeof i.column === 'string' && COLUMN_KEY.test(i.column) ? { column: i.column } : {}),

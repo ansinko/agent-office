@@ -4,16 +4,15 @@
 // done yet stands, worked out from git in the code repository and its specification repository.
 //
 // Roadmaps are the newest docs/plans/<module>/YYYY-MM-DD-roadmap.md of each module on the code
-// repository's origin/main, or, for a module with none there yet, on an unmerged branch whose name
-// says roadmap. Each has a table between <!-- waves:start --> and <!-- waves:end --> with the columns
+// repository's origin/main, plus the waves only an unmerged branch whose name says roadmap adds. Each has a table between <!-- waves:start --> and <!-- waves:end --> with the columns
 // Wave, Depends on, Tickets, REQ, Scope and Description. A wave lands in the first column that fits:
 //
 //   (left off)   done: its branch origin/feature/*<module>-<wave>-* is merged into origin/main (or, for
 //                a wave named W<n> with no such branch, every ticket has <module>/test-cases/<NN>-*)
 //   In progress  that branch exists and isn't merged
 //   Waiting      its questions wait on the analyst: an unmerged origin/plan/*<module>-<wave>-* in the
-//                spec repository, or a questions/v*-otazky-implementacny-plan-<wave>.md on its main
-//                that isn't premietnute yet
+//                spec repository (or one only in the spec checkout, not pushed yet), or a
+//                questions/v*-otazky-implementacny-plan-<wave>.md on its main that isn't premietnute yet
 //   Ready        its questions are premietnute on the spec repository's main
 //   Not started  no questions yet (prepare-wave hasn't run), a wave it depends on isn't done, or its
 //                roadmap isn't on main
@@ -21,10 +20,11 @@
 // A module's questions about the roadmap itself (v*-otazky-implementacna-roadmapa.md, on main or an
 // unmerged plan branch) are a card of their own while they wait.
 //
-// Usage: node roadmap-waves.mjs [--code <dir>] [--spec <dir>] [--modules reference-data,I-08] [--no-fetch]
+// Usage: node roadmap-waves.mjs [--code <dir>] [--spec <dir>] [--modules reference-data,I-08] [--mine [--me <email>]] [--no-fetch]
 // --code defaults to the current directory (the floor's checkout), --spec to a sibling
-// eranet3-specification or specification folder, and --modules (slugs or service codes) to every
-// module. It only reads: git fetch updates the remote-tracking branches, nothing else.
+// eranet3-specification or specification folder. Every module is shown unless --modules (slugs or
+// service codes) or --mine narrow it; --mine adds the modules your own commits on unmerged branches
+// touch. It only reads: git fetch updates the remote-tracking branches, nothing else.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -37,6 +37,7 @@ const option = (name) => {
 
 const code = path.resolve(option('--code') ?? process.cwd());
 const spec = path.resolve(option('--spec') ?? ['eranet3-specification', 'specification'].map((d) => path.join(code, '..', d)).find((d) => existsSync(d)) ?? fail('No --spec given, and no specification folder next to the code'));
+const me = option('--me');
 const wanted = (option('--modules') ?? '').split(',').map((m) => m.trim().toLowerCase()).filter(Boolean);
 
 function fail(why) {
@@ -54,7 +55,36 @@ const specFiles = lines(git(spec, 'ls-tree', '-r', '--name-only', 'origin/main')
 const refs = (dir, prefix, merged) => lines(git(dir, 'for-each-ref', `--${merged ? '' : 'no-'}merged`, 'origin/main', '--format=%(refname:short)', `refs/remotes/origin/${prefix}`)).filter((r) => r !== 'origin/HEAD' && r !== 'origin');
 const featuresMerged = refs(code, 'feature/', true);
 const featuresOpen = refs(code, 'feature/', false);
-const plansOpen = refs(spec, 'plan/', false);
+/** Plan branches only in the spec checkout: prepare-wave ran there, but nobody pushed its questions. */
+const unpushed = new Set(
+  lines(git(spec, 'for-each-ref', '--no-merged', 'origin/main', '--format=%(refname:short)%09%(upstream:short)%09%(upstream:track)', 'refs/heads/plan/'))
+    .map((l) => l.split('\t'))
+    .filter(([, upstream, track]) => !upstream || track === '[gone]')
+    .map(([name]) => name),
+);
+const plansOpen = [...refs(spec, 'plan/', false), ...unpushed];
+const unmergedCode = refs(code, '', false);
+
+/**
+ * With --mine, the modules your own commits on unmerged branches touch: code branches (docs/plans/<m>/,
+ * services/<m>/, modules/<m>/) and spec plan branches (modules/<category>/<m>/). Your commits are
+ * the ones with your email (--me, else the code repository's user.email).
+ */
+const mine = argv.includes('--mine') ? mineFrom(me ?? git(code, 'config', 'user.email')) : undefined;
+
+function mineFrom(email) {
+  const found = new Set();
+  const touched = (dir, branch, pattern) => {
+    if (!lines(git(dir, 'log', '--format=%ae', `origin/main..${branch}`)).some((a) => a.toLowerCase() === email.toLowerCase())) return;
+    for (const f of lines(git(dir, 'diff', '--name-only', `origin/main...${branch}`))) {
+      const m = pattern.exec(f);
+      if (m) found.add(m[1]);
+    }
+  };
+  for (const b of unmergedCode) touched(code, b, /^(?:docs\/plans|platform\/backend\/src\/services|modules)\/([^/]+)\//);
+  for (const b of plansOpen) touched(spec, b, /^modules\/[^/]+\/([^/]+)\//);
+  return found;
+}
 
 const COLUMNS = [
   { key: 'not-started', title: '⏸️ Not started' },
@@ -72,13 +102,15 @@ const STAV = {
 };
 const stavLabel = (stav) => STAV[stav] ?? { name: stav || 'bez stavu', color: '#6e7781' };
 
-/** The page of a file at branch `ref`, on the code repository's host. */
-const pageOf = (() => {
-  const m = /^(?:https?:\/\/|ssh:\/\/)?(?:[\w.-]+@)?([\w.-]+)[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(git(code, 'remote', 'get-url', 'origin'));
+/** The page of a file at branch `ref` of the repository at `dir`, on its host. */
+const pagesOf = (dir) => {
+  const m = /^(?:https?:\/\/|ssh:\/\/)?(?:[\w.-]+@)?([\w.-]+)[/:]([^/]+\/[^/]+?)(?:\.git)?\/?$/.exec(git(dir, 'remote', 'get-url', 'origin'));
   if (!m) return () => '';
   const base = `https://${m[1]}/${m[2]}`;
   return (file, ref) => (m[1] === 'bitbucket.org' ? `${base}/src/${ref}/${file}` : `${base}/blob/${ref}/${file}`);
-})();
+};
+const pageOf = pagesOf(code);
+const specPageOf = pagesOf(spec);
 
 const ROADMAP = /^docs\/plans\/([^/]+)\/(\d{4}-\d{2}-\d{2})-roadmap\.md$/;
 
@@ -92,27 +124,81 @@ function newestOn(ref, files) {
   return [...newest].map(([dir, file]) => ({ dir, file, ref }));
 }
 
-/** Every module's roadmap: main's, else the newest on an unmerged branch about a roadmap. */
+/** A roadmap file at `ref`: its heading and waves, or undefined without a waves table. */
+function readRoadmap(file, ref) {
+  const text = git(code, 'show', `${ref}:${file}`);
+  const table = /<!-- waves:start -->([\s\S]*?)<!-- waves:end -->/.exec(text);
+  return table && { file, ref, heading: /^# (.*)$/m.exec(text)?.[1], waves: wavesOf(table[1]).map((w) => ({ ...w, ref, file, text: sectionOf(text, w.id) })) };
+}
+
+/**
+ * Every module's roadmap: main's waves, and the waves only an unmerged branch about a roadmap has
+ * (newest commit first). A module with no roadmap on main takes its heading from such a branch.
+ */
 function roadmaps() {
-  const found = new Map(newestOn('origin/main', codeFiles).map((r) => [r.dir, r]));
-  for (const branch of refs(code, '', false).filter((b) => /roadmap/i.test(b))) {
-    for (const r of newestOn(branch, lines(git(code, 'ls-tree', '-r', '--name-only', branch, 'docs/plans/')))) {
-      const had = found.get(r.dir);
-      if (!had || (had.ref !== 'origin/main' && had.file < r.file)) found.set(r.dir, r);
-    }
-  }
+  const byDir = new Map();
+  const add = (dir, r) => r && byDir.set(dir, [...(byDir.get(dir) ?? []), r]);
+  for (const { dir, file, ref } of newestOn('origin/main', codeFiles)) add(dir, readRoadmap(file, ref));
+  const branches = unmergedCode.filter((b) => /roadmap/i.test(b)).sort((a, b) => git(code, 'log', '-1', '--format=%ct', b).localeCompare(git(code, 'log', '-1', '--format=%ct', a)));
+  for (const branch of branches) for (const { dir, file, ref } of newestOn(branch, lines(git(code, 'ls-tree', '-r', '--name-only', branch, 'docs/plans/')))) add(dir, readRoadmap(file, ref));
   const out = [];
-  for (const { dir, file, ref } of [...found.values()].sort((a, b) => a.dir.localeCompare(b.dir))) {
-    const text = git(code, 'show', `${ref}:${file}`);
-    const table = /<!-- waves:start -->([\s\S]*?)<!-- waves:end -->/.exec(text);
-    if (!table) continue;
-    const heading = /^# (.*)$/m.exec(text)?.[1] ?? dir;
+  for (const [dir, versions] of [...byDir].sort(([a], [b]) => a.localeCompare(b))) {
+    const [base] = versions;
+    const heading = base.heading ?? dir;
     const service = /\bI-(\d+)\b/.exec(heading)?.[1];
     const slug = /`([a-z0-9-]+)`/.exec(heading)?.[1] ?? dir;
     const name = service ? `I-${service}` : slug;
-    if (wanted.length && !wanted.includes(slug) && !wanted.includes(name.toLowerCase())) continue;
+    if (!chosen({ dir, slug, name })) continue;
     const prefix = service ? `I${service}` : slug.toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 20);
-    out.push({ file, ref, slug, name, prefix, waves: wavesOf(table[1]) });
+    const waves = [];
+    for (const v of versions) for (const w of v.waves) if (!waves.some((x) => x.id === w.id)) waves.push(w);
+    out.push({ file: base.file, ref: base.ref, slug, name, prefix, waves });
+  }
+  return out;
+}
+
+/** Whether the board shows a module: named in --modules, or, with --mine, one you have unmerged work in. */
+function chosen(m) {
+  if (!wanted.length && !mine) return true;
+  return wanted.includes(m.slug) || wanted.includes(m.name.toLowerCase()) || !!mine?.has(m.dir) || !!mine?.has(m.slug);
+}
+
+/** The roadmap's own section about a wave (### W5 — …), up to the next heading of its level or above. */
+function sectionOf(text, id) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((l) => new RegExp(`^###\\s+${id}\\s+[—–-]`, 'i').test(l));
+  if (start < 0) return '';
+  const end = lines.findIndex((l, i) => i > start && /^#{1,3}\s/.test(l));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n').trim();
+}
+
+/** A spec file's frontmatter fields and the text after it. */
+function specDoc(file) {
+  const text = git(spec, 'show', `origin/main:${file}`);
+  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
+  const fields = Object.fromEntries(lines(m?.[1] ?? '').map((l) => /^([\w-]+):\s*(.*)$/.exec(l)).filter(Boolean).map((x) => [x[1], x[2]]));
+  return { fields, rest: m ? m[2] : text };
+}
+
+/** What a wave's tickets say, and their test scenarios, as Markdown for its card. */
+function ticketsOf(module, wave) {
+  const out = [];
+  for (const nn of wave.tickets) {
+    const ticket = specFiles.find((f) => new RegExp(`^modules/[^/]+/${module.slug}/tickets/${nn}-[^/]+/${nn}-[^/]+\\.md$`).test(f));
+    if (!ticket) {
+      out.push(`#### Tiket ${nn}`, '', '_V spec main nie je._', '');
+      continue;
+    }
+    const { fields, rest } = specDoc(ticket);
+    const title = /^# (.*)$/m.exec(rest)?.[1] ?? `${nn} — ${fields.nazov ?? ''}`;
+    const what = rest.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !p.startsWith('#')) ?? '';
+    out.push(`#### [${title}](${specPageOf(ticket, 'main')})`, '', `stav \`${fields.stav ?? '?'}\` · blokovaný kým ${fields.blokovany_kym ?? '-'} · nedoriešené ${fields.nedoriesene ?? '-'}`, '', what.length > 900 ? `${what.slice(0, 900)}…` : what, '');
+    const scenarios = specFiles.find((f) => f.startsWith(`${path.dirname(ticket)}/test-scenarios/`) && f.endsWith('.md'));
+    if (scenarios) {
+      const doc = specDoc(scenarios);
+      const count = (level) => (doc.rest.match(new RegExp(`^#+ TS-${nn}-${level}-`, 'gm')) ?? []).length;
+      out.push(`Test scenáre: [${path.basename(scenarios)}](${specPageOf(scenarios, 'main')}) · stav \`${doc.fields.stav ?? '?'}\` · unit ${count('U')} · integračné ${count('I')} · e2e ${count('E')}`, '');
+    } else out.push('Test scenáre: _zatiaľ nie sú_', '');
   }
   return out;
 }
@@ -152,10 +238,24 @@ function planQuestions(branch) {
 
 const ownBranch = (module, wave) => (b) => b.includes(`${module.slug}-${wave.id.toLowerCase()}-`);
 
-function done(module, wave) {
+/** A module's test cases on main: the folder may be named for the service, a prefix of its slug (identity). */
+const testedIn = (module, nn) => codeFiles.some((f) => {
+  const m = /(?:^|\/)([^/]+)\/test-cases\/(\d{2})-/.exec(f);
+  return m?.[2] === nn && module.slug.startsWith(m[1]);
+});
+
+/**
+ * Done: its branch is merged; or, named W<n> with no branch, all its tickets have test cases; or a
+ * wave that depends on it has started, which prepare-wave only lets happen once it was merged.
+ */
+function done(module, wave, seen = new Set()) {
+  if (seen.has(wave.id)) return false;
+  seen.add(wave.id);
   const mine = ownBranch(module, wave);
-  const tested = (nn) => codeFiles.some((f) => f.includes(`${module.slug}/test-cases/${nn}-`));
-  return featuresMerged.some(mine) || (!featuresOpen.some(mine) && /^W\d+$/i.test(wave.id) && wave.tickets.length > 0 && wave.tickets.every(tested));
+  if (featuresMerged.some(mine)) return true;
+  if (featuresOpen.some(mine)) return false;
+  if (/^W\d+$/i.test(wave.id) && wave.tickets.length > 0 && wave.tickets.every((nn) => testedIn(module, nn))) return true;
+  return module.waves.some((w) => w.deps.includes(wave.id) && (featuresOpen.some(ownBranch(module, w)) || done(module, w, seen)));
 }
 
 const distinct = (labels) => [...new Map(labels.map((l) => [l.name, l])).values()];
@@ -175,8 +275,9 @@ function placeOf(module, wave) {
     return !dep || !done(module, dep);
   });
   const after = blockers.length ? [{ name: `po ${blockers.join(', ')}`, color: '#6e7781' }] : [];
-  if (plan || unanswered.length) return { column: 'waiting', plan, questions, labels: [...distinct(unanswered.map((q) => stavLabel(q.stav))), ...after] };
-  if (module.ref !== 'origin/main') return { column: 'not-started', questions, labels: [{ name: 'roadmap nie je v main', color: '#bc4c00' }] };
+  const local = plan && unpushed.has(plan) ? [{ name: 'otázky nepushnuté', color: '#bc4c00' }] : [];
+  if (plan || unanswered.length) return { column: 'waiting', plan, questions, labels: [...local, ...distinct(unanswered.map((q) => stavLabel(q.stav))), ...after] };
+  if (wave.ref !== 'origin/main') return { column: 'not-started', questions, labels: [{ name: 'roadmap nie je v main', color: '#bc4c00' }] };
   if (questions.length) return { column: 'ready', questions, labels: [stavLabel('premietnute'), ...after] };
   if (blockers.length) return { column: 'not-started', labels: [{ name: `blokovaná: ${blockers.join(', ')}`, color: '#cf222e' }] };
   return { column: 'not-started', labels: [{ name: 'bez prepare-wave', color: '#9a6700' }], prepare: true };
@@ -218,7 +319,7 @@ for (const module of roadmaps()) {
     const tickets = wave.tickets.join(', ') || '-';
     const prompt =
       place.column === 'ready'
-        ? `Take wave ${wave.id} of the module \`${module.slug}\` (roadmap \`${module.file}\`, tickets ${tickets}): load the implement-feature skill and start with its Phase 0.`
+        ? `Take wave ${wave.id} of the module \`${module.slug}\` (roadmap \`${wave.file}\`, tickets ${tickets}): load the implement-feature skill and start with its Phase 0.`
         : place.column === 'progress'
           ? `Carry on with wave ${wave.id} of the module \`${module.slug}\` on branch \`${short(place.branch)}\`: load the implement-feature skill and pick up where the branch left off.`
           : place.prepare
@@ -228,7 +329,7 @@ for (const module of roadmaps()) {
       key: `${module.prefix}-${wave.id.toUpperCase()}`,
       ref: `${module.name} ${wave.id}`,
       title: `${module.name} ${wave.id}: ${wave.description}`,
-      url,
+      url: pageOf(wave.file, short(wave.ref)),
       author: module.slug,
       column: place.column,
       labels: [moduleLabel, ...place.labels, ...(wave.scope ? [{ name: wave.scope, color: '#8c959f' }] : [])],
@@ -242,10 +343,12 @@ for (const module of roadmaps()) {
         `- Depends on: ${wave.deps.join(', ') || '-'}`,
         `- Scope: ${wave.scope || '-'}`,
         `- REQ: ${wave.req || '-'}`,
-        `- Roadmap: \`${module.file}\`${module.ref === 'origin/main' ? '' : ` na \`${short(module.ref)}\``}`,
+        `- Roadmap: \`${wave.file}\`${wave.ref === 'origin/main' ? '' : ` na \`${short(wave.ref)}\``}`,
         ...(place.branch ? [`- Branch: \`${short(place.branch)}\``] : []),
         ...(place.plan ? [`- Questions on: \`${short(place.plan)}\` (spec)`] : []),
         ...(place.questions ?? []).map((q) => `- Questions: \`${q.file}\` (${q.stav})`),
+        ...(wave.text ? ['', '### Z roadmapu', '', wave.text.length > 5000 ? `${wave.text.slice(0, 5000)}…` : wave.text] : []),
+        ...(wave.tickets.length ? ['', '### Tikety', '', ...ticketsOf(module, wave)] : []),
       ].join('\n'),
       ...(prompt ? { prompt } : {}),
     });

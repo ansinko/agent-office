@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { issueKey, type BoardState, type Choice, type Comment, type Issue, type IssueDetail, type Label, type BoardRef } from '../../../shared/protocol.js';
+import { issueKey, type BoardState, type IssueColumn, type Choice, type Comment, type Issue, type IssueDetail, type Label, type BoardRef } from '../../../shared/protocol.js';
 import type { Tracker } from '../types.js';
 
 /** The floor's tracker.json. */
@@ -79,12 +79,40 @@ export function issueOf(v: unknown): Issue | undefined {
     body: str(i.body, 4000),
     comments: 0,
     ...(typeof i.prompt === 'string' && i.prompt.trim() ? { prompt: i.prompt.slice(0, 20_000) } : {}),
+    ...(typeof i.column === 'string' && COLUMN_KEY.test(i.column) ? { column: i.column } : {}),
   };
 }
 
-/** What the command printed: a list of issues, or { issues: [...] }. */
-export function issuesOf(stdout: string): Issue[] {
+const COLUMN_KEY = /^[a-z0-9][a-z0-9-]{0,29}$/;
+const MAX_COLUMNS = 8;
+
+/** The columns the command lays the board out in, in order; none when it leaves that to the office. */
+export function columnsOf(raw: unknown): IssueColumn[] {
+  if (!Array.isArray(raw)) return [];
+  const out: IssueColumn[] = [];
+  for (const v of raw) {
+    const c = (v ?? {}) as Record<string, unknown>;
+    const key = typeof c.key === 'string' && COLUMN_KEY.test(c.key) ? c.key : undefined;
+    const title = str(c.title, 60).trim();
+    if (!key || !title || out.some((o) => o.key === key)) continue;
+    out.push(c.progress === true ? { key, title, progress: true } : { key, title });
+    if (out.length >= MAX_COLUMNS) break;
+  }
+  return out;
+}
+
+/** What the command printed: a list of issues, or { issues: [...], columns?: [...] }. */
+export function boardOf(stdout: string): { items: Issue[]; columns: IssueColumn[] } {
   const parsed = JSON.parse(stdout);
+  return { items: issuesIn(parsed), columns: columnsOf(parsed?.columns) };
+}
+
+/** Just the issues of what the command printed. */
+export function issuesOf(stdout: string): Issue[] {
+  return issuesIn(JSON.parse(stdout));
+}
+
+function issuesIn(parsed: any): Issue[] {
   const list = Array.isArray(parsed) ? parsed : parsed?.issues;
   if (!Array.isArray(list)) throw new Error('The tracker command printed no list of issues');
   const seen = new Set<string>();
@@ -188,8 +216,9 @@ export class CommandTracker implements Tracker {
     this.issues = { ...this.issues, loading: true };
     this.onIssues(this.issues);
     try {
-      const items = this.mark(issuesOf(await this.run()));
-      this.issues = { items, fetchedAt: Date.now(), loading: false };
+      const board = boardOf(await this.run());
+      const items = this.mark(board.items);
+      this.issues = { items, ...(board.columns.length ? { columns: board.columns } : {}), fetchedAt: Date.now(), loading: false };
     } catch (err) {
       this.issues = { ...this.issues, loading: false, error: (err as Error).message, fetchedAt: Date.now() };
     }

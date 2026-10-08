@@ -35,6 +35,16 @@ export interface Issue {
   comments: number;
   /** The task a worker gets for it, when the tracker says what that is (a command tracker's own prompt). */
   prompt?: string;
+  /** Which of the board's own columns it goes in (BoardState.columns' key). */
+  column?: string;
+}
+
+/** A column of the issues board that the tracker lays out itself. */
+export interface IssueColumn {
+  key: string;
+  title: string;
+  /** Where a card goes once a worker in the office takes it. */
+  progress?: boolean;
 }
 
 export interface Pull {
@@ -61,6 +71,8 @@ export interface Pull {
 
 export interface BoardState<T> {
   items: T[];
+  /** The issues board's columns, when the tracker lays them out (a command tracker); else the office's own. */
+  columns?: IssueColumn[];
   error?: string;
   fetchedAt: number;
   loading: boolean;

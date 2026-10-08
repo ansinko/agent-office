@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { issueKey } from '../src/shared/protocol.js';
 import { commandTracker } from '../src/server/hosts/command/index.js';
-import { CommandTracker, commandConfig, issuesOf } from '../src/server/hosts/command/tracker.js';
+import { CommandTracker, boardOf, commandConfig, issuesOf } from '../src/server/hosts/command/tracker.js';
 
 function folder(t: { after(fn: () => void): void }): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-cmd-'));
@@ -119,4 +119,28 @@ test('a command that fails says so on the board', async (t) => {
   const gone = commandTracker(dir, dir, () => {})!;
   await gone.tracker.refresh();
   assert.match(gone.tracker.issues.error ?? '', /\/no\/such\/program was not found/);
+});
+
+test('the command can lay the board out in columns of its own', async (t) => {
+  const board = boardOf(
+    JSON.stringify({
+      columns: [{ key: 'waiting', title: '⏳ Waiting' }, { key: 'ready', title: '✅ Ready' }, { key: 'doing', title: '🚧 Doing', progress: true }, { key: 'ready', title: 'twice' }, { key: 'Bad Key', title: 'no' }, { key: 'x', title: '' }],
+      issues: [{ key: 'I16-W5', title: 'W5', column: 'ready' }, { key: 'I16-W6', title: 'W6', column: 'NOPE' }],
+    }),
+  );
+  assert.deepEqual(board.columns, [{ key: 'waiting', title: '⏳ Waiting' }, { key: 'ready', title: '✅ Ready' }, { key: 'doing', title: '🚧 Doing', progress: true }]);
+  assert.deepEqual(
+    board.items.map((i) => i.column),
+    ['ready', undefined],
+  );
+  assert.deepEqual(boardOf('[]').columns, []);
+
+  const dir = folder(t);
+  printing(dir, { columns: [{ key: 'ready', title: 'Ready' }], issues: [{ key: 'I16-W5', title: 'W5', column: 'ready' }] });
+  const tracker = commandTracker(dir, dir, () => {})!.tracker;
+  await tracker.refresh();
+  assert.deepEqual(tracker.issues.columns, [{ key: 'ready', title: 'Ready' }]);
+  printing(dir, [{ key: 'I16-W5', title: 'W5' }]);
+  await tracker.refresh();
+  assert.equal(tracker.issues.columns, undefined);
 });

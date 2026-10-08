@@ -1,5 +1,5 @@
 import './boards.css';
-import type { Issue, Label, Pull, WorkerInfo } from '../../shared/protocol';
+import type { Issue, IssueColumn, Label, Pull, WorkerInfo } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
@@ -27,6 +27,8 @@ interface Column<T> {
 const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt);
 
 function issueColumns(items: Issue[]): Column<Issue>[] {
+  const own = store.issues.columns;
+  if (own?.length) return trackerColumns(items, own);
   const open = items.filter((i) => i.state === 'open');
   const started = open.filter((i) => inProgress(i, store.taskForIssue(i.key)));
   const todo = open.filter((i) => !started.includes(i));
@@ -35,6 +37,22 @@ function issueColumns(items: Issue[]): Column<Issue>[] {
     { key: 'progress', title: '🚧 In progress', items: started },
     { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'open').sort(byUpdated), max: 40 },
   ];
+}
+
+/**
+ * The tracker's own columns. A card goes in the one it names; a card a worker here has just taken
+ * goes in the first progress column, and an open one naming none goes in the first column.
+ */
+function trackerColumns(items: Issue[], own: IssueColumn[]): Column<Issue>[] {
+  const progress = own.find((c) => c.progress);
+  const keys = new Set(own.map((c) => c.key));
+  const at = (i: Issue): string | undefined => {
+    const task = store.taskForIssue(i.key);
+    if (progress && (i.taken || task?.status === 'running') && !own.find((c) => c.key === i.column)?.progress) return progress.key;
+    if (i.column && keys.has(i.column)) return i.column;
+    return i.state === 'open' ? own[0].key : undefined;
+  };
+  return own.map((c) => ({ key: c.key, title: c.title, items: items.filter((i) => at(i) === c.key) }));
 }
 
 function pullColumns(items: Pull[]): Column<Pull>[] {

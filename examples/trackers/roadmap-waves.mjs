@@ -348,7 +348,7 @@ for (const module of roadmaps()) {
     issues.push({
       key: `${module.prefix}-OTAZKY`,
       ref: `${module.name} otázky`,
-      title: `${module.name}: otázky mimo vĺn čakajú (${moduleQs.length})`,
+      title: `otázky mimo vĺn čakajú (${moduleQs.length})`,
       url,
       author: module.slug,
       column: 'waiting',
@@ -377,7 +377,7 @@ for (const module of roadmaps()) {
     issues.push({
       key: `${module.prefix}-${wave.id.toUpperCase()}`,
       ref: `${module.name} ${wave.id}`,
-      title: `${module.name} ${wave.id}: ${wave.description}`,
+      title: wave.description,
       url: pageOf(wave.file, short(wave.ref)),
       author: module.slug,
       column: place.column,

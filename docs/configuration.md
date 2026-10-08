@@ -8,6 +8,18 @@ The office keeps its data in `~/agent-office` (`--home` or `AGENT_OFFICE_HOME` t
 
 Already have a checkout? Pick its repository anyway: a checkout of it that's already where the workspace folder would clone it is used as it is. You can still start the office in a project, `agent-office ~/code/my-project`: that project becomes a floor, and the office keeps its data in `~/code/my-project/.agent-office` as it did before there were floors. An office that already ran in a project carries on in it when you start `agent-office` there again. An admin can take that project off the building in the elevator like any other floor.
 
+## The issues board from a command of your own
+
+A floor whose work isn't in GitHub issues can fill its 📌 Issues board from a program of its own. Put a `tracker.json` in the floor's `.agent-office/` folder (kept out of git, like everything there):
+
+```json
+{ "name": "Roadmap waves", "command": ["node", "/path/to/roadmap-waves.mjs", "--spec", "/path/to/spec-repo"], "timeout": 120000 }
+```
+
+The office runs `command` in the floor's checkout, without a shell, whenever it looks at the boards, and shows what it prints in place of the host's issues: a JSON list of issues, or `{ "issues": [...] }`. Each has a `key` (`12`, or letters, a dash and letters or digits: `I16-W5`) and a `title`, and may have `ref` (how it's shown), `state` (`open` or `closed`), `url`, `author`, `labels` (names, or `{ name, color: "#rrggbb" }`), `assignees`, `createdAt`, `updatedAt`, `body` (Markdown) and `prompt`: the task a worker gets when you hand it the card, in place of the office's 🤖 issue prompt. An issue with assignees is In progress. The board only lists them: comments, closing and labels belong where the issues come from, so the issue window leaves those out. A worker taking one marks it taken until the command lists it with an assignee. A missing or broken `tracker.json` shows on the board, and taking the file away gives the floor its host's issues back after a restart.
+
+`examples/trackers/roadmap-waves.mjs` is one such command: it puts each wave of a project's roadmaps (a waves table in `docs/plans/<module>/*-roadmap.md`) on the board, ready, in progress or done, worked out from the branches and questions in the code and specification repositories.
+
 ## Command line
 
 ```

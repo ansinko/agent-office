@@ -6,7 +6,7 @@ import { h, openModal, timeAgo } from './dom';
 import { openIssue } from './board-windows/issue-window';
 import { labelChip, openLabels } from './board-windows/labels';
 import { noteSeed, refText } from './board-windows/notes';
-import { hostName } from './board-windows/pieces';
+import { hostName, trackerName } from './board-windows/pieces';
 import { inProgress } from './board-windows/progress';
 import type { BoardActions } from './board-windows/prompts';
 import { openPull } from './board-windows/pull-window';
@@ -133,7 +133,8 @@ function card(it: Issue | Pull, title: string, meta: (Node | string)[], i: numbe
 export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActions) {
   const body = h('div.body');
   const status = h('span.board-status');
-  const refresh = h('button.btn', { title: `Refresh from ${hostName()}`, onclick: () => net.send({ t: 'board.refresh' }) }, '🔄 Refresh');
+  const source = () => (kind === 'issues' ? trackerName() : hostName());
+  const refresh = h('button.btn', { title: `Refresh from ${source()}`, onclick: () => net.send({ t: 'board.refresh' }) }, '🔄 Refresh');
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const el = h('div.modal.board', { role: 'dialog', 'aria-label': kind === 'issues' ? 'Issues board' : 'Pull requests board' }, h('header', {}, h('h2', {}, kind === 'issues' ? '📌 Issues' : '🔀 Pull Requests'), status, refresh, close), body);
 
@@ -254,8 +255,8 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
     const caret = active instanceof HTMLInputElement ? ([active.selectionStart, active.selectionEnd] as const) : null;
     body.replaceChildren();
     if (st.error && !st.items.length) {
-      const gh = store.currentFloor()?.host?.kind === 'github';
-      body.append(h('div.board-error', {}, `Couldn't load from ${hostName()}: ${st.error}`, gh ? h('br') : null, gh ? h('small', {}, 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).') : null));
+      const gh = (kind === 'issues' ? store.currentFloor()?.tracker?.kind : store.currentFloor()?.host?.kind) === 'github';
+      body.append(h('div.board-error', {}, `Couldn't load from ${source()}: ${st.error}`, gh ? h('br') : null, gh ? h('small', {}, 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).') : null));
       return;
     }
     const all = boardLabels(st.items);

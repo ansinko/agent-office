@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { issueKey, type BoardState, type IssueColumn, type Choice, type Comment, type Issue, type IssueDetail, type Label, type BoardRef } from '../../../shared/protocol.js';
+import { issueKey, type BoardState, type IssueColumn, type IssueFile, type Choice, type Comment, type Issue, type IssueDetail, type Label, type BoardRef } from '../../../shared/protocol.js';
 import type { Tracker } from '../types.js';
 
 /** The floor's tracker.json. */
@@ -15,6 +15,8 @@ export interface CommandConfig {
   command: string[];
   /** How long it may take, in ms. */
   timeout: number;
+  /** The program that prints one of an issue's files, given its id as the last argument. */
+  show?: string[];
 }
 
 const CONFIG = 'tracker.json';
@@ -25,6 +27,8 @@ const CLAIM_MS = 6 * 60 * 60 * 1000;
 const GREY = '#8b949e';
 /** Its own text is all the issue window has to show, so it may run longer than a host's list does. */
 const BODY_MAX = 16_000;
+/** How long a file the show command prints may be. */
+const FILE_MAX = 2 * 1024 * 1024;
 
 /**
  * The floor's command tracker, from `<dataDir>/tracker.json`: undefined when there's no such file.
@@ -42,7 +46,9 @@ export function commandConfig(dataDir: string): CommandConfig | undefined {
   if (!Array.isArray(command) || !command.length || !command.every((a) => typeof a === 'string' && a.length > 0)) throw new Error(`${CONFIG}: "command" must be a list of strings, the program first`);
   const name = typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 60) : path.basename(command[command.length - 1]);
   const timeout = Number.isFinite(c.timeout) && c.timeout > 0 ? Math.min(c.timeout, 600_000) : DEFAULT_TIMEOUT;
-  return { name, command, timeout };
+  const show = c.show;
+  if (show !== undefined && (!Array.isArray(show) || !show.length || !show.every((a) => typeof a === 'string' && a.length > 0))) throw new Error(`${CONFIG}: "show" must be a list of strings, the program first`);
+  return show ? { name, command, timeout, show } : { name, command, timeout };
 }
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -82,7 +88,26 @@ export function issueOf(v: unknown): Issue | undefined {
     comments: 0,
     ...(typeof i.prompt === 'string' && i.prompt.trim() ? { prompt: i.prompt.slice(0, 20_000) } : {}),
     ...(typeof i.column === 'string' && COLUMN_KEY.test(i.column) ? { column: i.column } : {}),
+    ...filesOf(i.files),
   };
+}
+
+const MAX_FILES = 30;
+
+/** An issue's files as the command printed them: each needs an id and a title, and an id comes once. */
+function filesOf(raw: unknown): { files?: IssueFile[] } {
+  if (!Array.isArray(raw)) return {};
+  const files: IssueFile[] = [];
+  for (const v of raw) {
+    const f = (v ?? {}) as Record<string, unknown>;
+    const id = str(f.id, 500);
+    const title = str(f.title, 200).trim();
+    const url = str(f.url, 2000);
+    if (!id.trim() || id !== id.trim() || id.startsWith('-') || !title || files.some((x) => x.id === id)) continue;
+    files.push(/^https?:\/\//.test(url) ? { id, title, url } : { id, title });
+    if (files.length >= MAX_FILES) break;
+  }
+  return files.length ? { files } : {};
 }
 
 const COLUMN_KEY = /^[a-z0-9][a-z0-9-]{0,29}$/;
@@ -184,6 +209,15 @@ export class CommandTracker implements Tracker {
     return undefined;
   }
 
+  /** One of the issue's own files, from the show command: only an id the issue lists is ever passed to it. */
+  async file(key: string, id: string): Promise<string> {
+    const show = this.config.show;
+    if (!show) throw new Error(`${this.who} has no "show" command for files`);
+    const it = this.issues.items.find((i) => i.key === key);
+    if (!it?.files?.some((f) => f.id === id)) throw new Error(`${key} has no file ${id}`);
+    return this.run([...show, id], FILE_MAX);
+  }
+
   refresh(): Promise<void> {
     this.listing ??= this.list().finally(() => (this.listing = undefined));
     return this.listing;
@@ -203,10 +237,10 @@ export class CommandTracker implements Tracker {
     return items.map(({ taken, ...it }) => (this.claimed.has(it.key) ? { ...it, taken: true } : it));
   }
 
-  private run(): Promise<string> {
-    const [file, ...args] = this.config.command;
+  private run(command = this.config.command, maxBuffer = 16 * 1024 * 1024): Promise<string> {
+    const [file, ...args] = command;
     return new Promise((resolve, reject) => {
-      execFile(file, args, { cwd: this.dir, maxBuffer: 16 * 1024 * 1024, timeout: this.config.timeout }, (err, stdout, stderr) => {
+      execFile(file, args, { cwd: this.dir, maxBuffer, timeout: this.config.timeout }, (err, stdout, stderr) => {
         if (!err) return resolve(stdout);
         const why = (stderr || err.message || '').trim().split('\n').slice(-2).join(' ');
         reject(new Error((err as NodeJS.ErrnoException).code === 'ENOENT' ? `${this.who}: ${file} was not found` : `${this.who} failed: ${why}`));

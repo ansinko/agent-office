@@ -10,6 +10,7 @@ import { openClose } from './close';
 import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
 import { avatar, commentCard, errorBox, hostName, nodes, spinnerRow } from './pieces';
+import { issueFiles } from './issue-files';
 import { issueContext, issuePrompt, type BoardActions } from './prompts';
 
 // ---- The issue window -----------------------------------------------------------------------------
@@ -28,7 +29,9 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
     detail.comments.push(c);
     render();
   });
-  conv.append(h('div.gh-col', {}, thread, comment.el));
+  const card = h('div.gh-col', {}, thread, comment.el);
+  conv.append(card);
+  const files = issueFiles(() => it, conv, card);
   // The footer stays put and renderFrame only shows, hides and relabels, so a board refresh never
   // pulls focus out of the provider picker.
   const closeIssue = h('button.btn', { type: 'button', title: 'Close this issue on GitHub', onclick: () => openClose('issue', it, net, load, { reasons: detail?.reasons ?? [], deleteBranch: false }) }, '✔️ Close issue…');
@@ -54,6 +57,7 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
       it.url ? h('a.grow', { href: it.url, target: '_blank', rel: 'noopener noreferrer' }, `Open on ${hostName()} ↗`) : h('span.grow'),
       h('button.btn', { type: 'button', title: 'Send a worker your own prompt about this issue', onclick: () => actions.ask(issueContext(it), `Ask about issue ${it.ref}`) }, '✍️ Ask a worker…'),
       h('button.btn', { type: 'button', title: 'Workers take it on together in the meeting room: a debate, lead & team, map-reduce or red / blue', onclick: () => actions.meeting(issueMeeting(it.key, it.title)) }, '🤝 Meeting…'),
+      files.button,
       closeIssue,
       queueProvider.element,
       queue,
@@ -77,6 +81,7 @@ export function openIssue(first: Issue, net: Net, actions: BoardActions) {
     pill.textContent = isOpen ? 'open' : 'closed';
     const task = store.taskForIssue(it.key);
     const onQueue = !!task && task.status !== 'done';
+    files.refresh();
     const readOnly = !!detail?.readOnly;
     closeIssue.classList.toggle('hidden', !isOpen || readOnly);
     comment.el.classList.toggle('hidden', readOnly);

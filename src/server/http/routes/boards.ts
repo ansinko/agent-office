@@ -15,9 +15,10 @@ export const boardRoutes = {
       // What the issue and PR windows show beyond the board cards (see hosts/): an issue by its key, a PR by its number.
       const n = Number(url.searchParams.get('number'));
       const key = issueKey(url.searchParams.get('key'));
-      if (p === '/api/board/issue' && key === undefined) return send(res, 400, { error: 'Bad key' });
+      const issuePath = p === '/api/board/issue' || p === '/api/board/issue/file';
+      if (issuePath && key === undefined) return send(res, 400, { error: 'Bad key' });
       // The repo's labels (for the label picker) are the one thing not about a single issue or PR.
-      if (p !== '/api/board/labels' && p !== '/api/board/issue' && (!Number.isSafeInteger(n) || n <= 0)) return send(res, 400, { error: 'Bad number' });
+      if (p !== '/api/board/labels' && !issuePath && (!Number.isSafeInteger(n) || n <= 0)) return send(res, 400, { error: 'Bad number' });
       if (!floor) return send(res, 404, { error: 'No such floor' });
       try {
         // "You" on comments is your own GitHub login once you've signed in to it.
@@ -30,6 +31,14 @@ export const boardRoutes = {
           return send(res, 200, mergeCommands ? { ...d, repo: { ...d.repo, mergeCommands } } : d);
         }
         if (p === '/api/board/issue' && key !== undefined) return send(res, 200, await floor.tracker.issueDetail(key, me));
+        if (p === '/api/board/issue/file' && key !== undefined) {
+          const id = url.searchParams.get('id') ?? '';
+          if (!floor.tracker.file) return send(res, 404, { error: "This floor's issues have no files" });
+          const text = await floor.tracker.file(key, id);
+          res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+          res.end(text);
+          return;
+        }
         if (p === '/api/board/labels') return send(res, 200, await floor.tracker.repoLabels());
         if (p === '/api/board/pull/diff') {
           const diff = await floor.host.pullDiff(n);

@@ -63,11 +63,9 @@ function trackerColumns(items: Issue[], own: IssueColumn[]): Column<Issue>[] {
 function pullColumns(items: Pull[]): Column<Pull>[] {
   const open = items.filter((p) => p.state === 'open');
   return [
-    { key: 'draft', title: '✏️ Draft', items: items.filter((p) => p.state === 'draft') },
     { key: 'review', title: '👀 In review', items: open.filter((p) => p.review !== 'approved') },
     { key: 'approved', title: '👍 Approved', items: open.filter((p) => p.review === 'approved') },
     { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'merged').sort(byUpdated), max: 30 },
-    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'closed').sort(byUpdated), max: 20 },
   ];
 }
 

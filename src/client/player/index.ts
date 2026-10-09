@@ -11,8 +11,12 @@ import { Effects } from './effects';
 // You: walking, running, jumping and sitting, bumping into things and climbing stairs, and the camera
 // that follows. The keys and the mouse are PlayerInput's (pointer.ts).
 
-const WALK = 4.6;
-const RUN = 7.5;
+/** Your pace with no coffee in you: already as brisk as a cup makes it (see features/coffee/caffeine.ts). */
+const PEP = 1.4;
+const WALK = 4.6 * PEP;
+const RUN = 7.5 * PEP;
+/** The furthest you move in one go: under a stair's depth, so a fast frame can't skip a step. */
+const STRIDE = 0.2;
 const JUMP_V = 6.4;
 const GRAVITY = 18;
 
@@ -307,7 +311,11 @@ export class PlayerController extends PlayerInput {
     return blockerAt(this, x, z, y, allowEscape);
   }
 
+  /** Long strides (a quick run on a slow frame) go in pieces, so each one meets at most one stair. */
   private tryMove(x: number, z: number) {
-    stepTo(this, x, z);
+    const x0 = this.pos.x;
+    const z0 = this.pos.z;
+    const n = Math.max(1, Math.ceil(Math.hypot(x - x0, z - z0) / STRIDE));
+    for (let i = 1; i <= n; i++) stepTo(this, x0 + ((x - x0) * i) / n, z0 + ((z - z0) * i) / n);
   }
 }

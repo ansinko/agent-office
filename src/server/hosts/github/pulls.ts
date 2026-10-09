@@ -4,13 +4,21 @@ import type { BoardRef, Choice, Comment, Label, Pull, PullDetail, RepoInfo, Revi
 import type { CodeHost, HostAs } from '../types.js';
 import { truncate } from '../../workers/util.js';
 import { GITHUB_CAPS, GITHUB_METHODS, GITHUB_REASONS, pullReview, pullState, readiness } from './map.js';
-import { checkOf, checksOf, commentsOf, gh, labels, postComment, putLabels, Relabels } from './gh.js';
+import { checkOf, checksOf, commentsOf, gh, labels, postComment, putLabels, Relabels, type GhRunner } from './gh.js';
 
 /** How long the repo's list of labels is kept before the label picker asks GitHub again. */
 const LABELS_MS = 60_000;
 /** `gh pr create` being run, alone or in a longer line: not one that only names it (a grep for it, a quoted string). */
 const CREATES_PR = /(?:^|[\s;&|(])gh\s+pr\s+create\b/;
 const PR_URL = /https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/g;
+
+const PULL_LIST_FIELDS = ['number', 'title', 'state', 'isDraft', 'url', 'author', 'labels', 'reviewDecision', 'headRefName', 'headRefOid', 'baseRefName', 'createdAt', 'updatedAt', 'additions', 'deletions', 'statusCheckRollup', 'body', 'closingIssuesReferences'];
+/** Older gh rejects some of the fields above; the list goes on without them, never without these. */
+const REQUIRED_PULL_LIST_FIELDS = new Set(['number', 'title', 'state']);
+
+function unsupportedJsonField(message: string): string | undefined {
+  return /^Unknown JSON field: "([^"]+)"/i.exec(message.trim())?.[1];
+}
 
 /** What `gh repo view` says each merge method needs switched on. */
 const ALLOWED: Record<string, string> = { squash: 'squashMergeAllowed', merge: 'mergeCommitAllowed', rebase: 'rebaseMergeAllowed' };
@@ -32,13 +40,14 @@ export class GitHubPulls implements CodeHost {
   constructor(
     private dir: string,
     private onPulls: (s: BoardState<Pull>) => void,
+    private runGh: GhRunner = gh,
   ) {}
 
   stop() {}
 
   /** The repository's full name, how it lets PRs merge, and what GitHub can do. Asked once (again after a failure). */
   repoInfo(): Promise<RepoInfo> {
-    this.repo ??= gh(['repo', 'view', '--json', 'nameWithOwner,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed'], this.dir).then((out) => {
+    this.repo ??= this.runGh(['repo', 'view', '--json', 'nameWithOwner,squashMergeAllowed,mergeCommitAllowed,rebaseMergeAllowed'], this.dir).then((out) => {
       const r = JSON.parse(out);
       return { name: String(r.nameWithOwner), methods: mergeMethods(r), reasons: GITHUB_REASONS, caps: GITHUB_CAPS };
     });
@@ -48,7 +57,7 @@ export class GitHubPulls implements CodeHost {
 
   /** Who the office's own gh is signed in as, which is who it comments as for everyone without their own. Asked once; '' when gh can't say. */
   viewer(): Promise<string> {
-    this.login ??= gh(['api', 'user', '--jq', '.login'], this.dir).then((out) => out.trim());
+    this.login ??= this.runGh(['api', 'user', '--jq', '.login'], this.dir).then((out) => out.trim());
     this.login.catch(() => (this.login = undefined));
     return this.login.catch(() => '');
   }
@@ -61,8 +70,8 @@ export class GitHubPulls implements CodeHost {
     const fields = 'number,body,state,isDraft,reviewDecision,headRefName,baseRefName,mergeable,mergeStateStatus,commits,comments,reviews,statusCheckRollup';
     const jq = '.[] | {id, in_reply_to_id, path, line, side, body, user: .user.login, created_at, html_url}';
     const [view, lines, repo, viewer] = await Promise.all([
-      gh(['pr', 'view', String(n), '--json', fields], this.dir),
-      gh(['api', `repos/{owner}/{repo}/pulls/${n}/comments?per_page=100`, '--paginate', '--jq', jq], this.dir),
+      this.runGh(['pr', 'view', String(n), '--json', fields], this.dir),
+      this.runGh(['api', `repos/{owner}/{repo}/pulls/${n}/comments?per_page=100`, '--paginate', '--jq', jq], this.dir),
       this.repoInfo(),
       me ?? this.viewer(),
     ]);
@@ -104,11 +113,11 @@ export class GitHubPulls implements CodeHost {
 
   /** The PR's unified diff, as `git diff` prints it. */
   pullDiff(n: number): Promise<string> {
-    return gh(['pr', 'diff', String(n), '--color', 'never'], this.dir, 60_000);
+    return this.runGh(['pr', 'diff', String(n), '--color', 'never'], this.dir, 60_000);
   }
 
   async findPull(n: number): Promise<{ url: string; state: PullState }> {
-    const raw = JSON.parse(await gh(['pr', 'view', String(n), '--json', 'url,state'], this.dir)) as { url: string; state: string };
+    const raw = JSON.parse(await this.runGh(['pr', 'view', String(n), '--json', 'url,state'], this.dir)) as { url: string; state: string };
     return { url: raw.url, state: pullState(raw.state, false) };
   }
 
@@ -131,7 +140,7 @@ export class GitHubPulls implements CodeHost {
    */
   async review(n: number, file: string, as?: HostAs): Promise<string> {
     // -F reads @file's contents as the value; {owner}/{repo} are filled in from the checkout's remote.
-    const url = (await gh(['api', '--method', 'POST', `repos/{owner}/{repo}/pulls/${n}/reviews`, '-F', `body=@${file}`, '-f', 'event=COMMENT', '--jq', '.html_url'], this.dir, 60_000, as?.env)).trim();
+    const url = (await this.runGh(['api', '--method', 'POST', `repos/{owner}/{repo}/pulls/${n}/reviews`, '-F', `body=@${file}`, '-f', 'event=COMMENT', '--jq', '.html_url'], this.dir, 60_000, as?.env)).trim();
     void this.refresh();
     return url;
   }
@@ -176,7 +185,7 @@ export class GitHubPulls implements CodeHost {
   /** Every label the repository has, for the label picker. Asked again after a minute (or a failure). */
   repoLabels(): Promise<Label[]> {
     if (!this.labelList || Date.now() - this.labelList.at > LABELS_MS) {
-      const list = gh(['api', 'repos/{owner}/{repo}/labels?per_page=100', '--paginate', '--jq', '.[] | {name, color, description}'], this.dir).then((out) =>
+      const list = this.runGh(['api', 'repos/{owner}/{repo}/labels?per_page=100', '--paginate', '--jq', '.[] | {name, color, description}'], this.dir).then((out) =>
         out
           .split('\n')
           .filter((l) => l.trim())
@@ -259,28 +268,24 @@ export class GitHubPulls implements CodeHost {
     this.onPulls(this.pulls);
     const asked = Date.now();
     try {
-      const fields = 'number,title,state,isDraft,url,author,labels,reviewDecision,headRefName,headRefOid,baseRefName,createdAt,updatedAt,additions,deletions,statusCheckRollup,body,closingIssuesReferences';
-      const [open, merged, closed] = await Promise.all([
-        gh(['pr', 'list', '--state', 'open', '--limit', '150', '--json', fields], this.dir),
-        gh(['pr', 'list', '--state', 'merged', '--limit', '30', '--json', fields], this.dir),
-        gh(['pr', 'list', '--state', 'closed', '--limit', '40', '--json', fields], this.dir),
-      ]);
+      const [open, merged, closed] = await Promise.all([this.listPulls('open', 150), this.listPulls('merged', 30), this.listPulls('closed', 40)]);
       // `--state closed` includes merged PRs; keep only the ones closed without merging.
       const seen = new Set<number>();
-      const all = [...JSON.parse(open), ...JSON.parse(merged), ...JSON.parse(closed)].filter((p: any) => !seen.has(p.number) && seen.add(p.number));
+      const all = [...open, ...merged, ...closed].filter((p: any) => !seen.has(p.number) && seen.add(p.number));
+      const repo = all.some((p: any) => typeof p.url !== 'string' || !p.url) ? await this.repoInfo().catch(() => undefined) : undefined;
       const fetched: Pull[] = all.map((p: any) => ({
         number: p.number,
         title: p.title,
         state: pullState(p.state, !!p.isDraft),
-        url: p.url,
+        url: typeof p.url === 'string' && p.url ? p.url : repo ? `https://github.com/${repo.name}/pull/${p.number}` : '',
         author: p.author?.login ?? '',
         labels: labels(p.labels),
         review: pullReview(p.reviewDecision ?? ''),
-        headRefName: p.headRefName,
+        headRefName: p.headRefName ?? '',
         headRefOid: typeof p.headRefOid === 'string' ? p.headRefOid : undefined,
-        baseRefName: p.baseRefName,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
+        baseRefName: p.baseRefName ?? '',
+        createdAt: p.createdAt ?? '',
+        updatedAt: p.updatedAt ?? p.createdAt ?? '',
         additions: p.additions ?? 0,
         deletions: p.deletions ?? 0,
         checks: checksOf(p.statusCheckRollup),
@@ -296,5 +301,18 @@ export class GitHubPulls implements CodeHost {
       this.pulls = { ...this.pulls, loading: false, error: (err as Error).message, fetchedAt: Date.now() };
     }
     this.onPulls(this.pulls);
+  }
+
+  private async listPulls(state: string, limit: number): Promise<any[]> {
+    let fields = [...PULL_LIST_FIELDS];
+    for (;;) {
+      try {
+        return JSON.parse(await this.runGh(['pr', 'list', '--state', state, '--limit', String(limit), '--json', fields.join(',')], this.dir));
+      } catch (err) {
+        const field = unsupportedJsonField((err as Error).message);
+        if (!field || REQUIRED_PULL_LIST_FIELDS.has(field) || !fields.includes(field)) throw err;
+        fields = fields.filter((f) => f !== field);
+      }
+    }
   }
 }

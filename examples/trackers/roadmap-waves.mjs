@@ -272,6 +272,8 @@ const allQuestions = (() => {
     for (const file of lines(git(spec, 'diff', '--name-only', `origin/main...${branch}`)).filter((f) => /\/questions\/v[^/]*\.md$/.test(f))) {
       if (!specFiles.includes(file) && !git(spec, 'ls-tree', '--name-only', branch, file)) continue;
       const stav = stavOf(file, branch);
+      // A stale branch whose copy main has already overtaken (merged another way) doesn't hold the file up.
+      if (specFiles.includes(file) && STAGE.indexOf(stav) <= STAGE.indexOf(stavOf(file))) continue;
       const had = best.get(file);
       if (!had || STAGE.indexOf(stav) > STAGE.indexOf(had.stav)) best.set(file, { file, stav, branch });
     }
@@ -314,10 +316,11 @@ function placeOf(module, wave) {
   if (done(module, wave)) return undefined;
   const mine = ownBranch(module, wave);
   const branch = featuresOpen.find(mine);
-  if (branch) return { column: 'progress', branch, labels: [] };
   const plan = plansOpen.find(mine);
   const questions = questionsOf(module, `-otazky-implementacny-plan-${wave.id.toLowerCase()}`);
   const unanswered = questions.filter((q) => q.stav !== 'premietnute');
+  // A wave being built stays In progress, but says so when questions it raised wait on the analyst.
+  if (branch) return { column: 'progress', branch, plan, questions, labels: distinct(unanswered.map((q) => stavLabel(q.stav))) };
   const unmerged = [...new Set(questions.filter((q) => q.branch).map((q) => short(q.branch)))];
   const blockers = wave.deps.filter((d) => {
     const dep = module.waves.find((x) => x.id === d);

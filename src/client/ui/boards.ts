@@ -26,6 +26,11 @@ interface Column<T> {
 
 const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.updatedAt.localeCompare(a.updatedAt);
 
+function githubErrorHint(error: string): string {
+  if (/^Unknown JSON field:/i.test(error)) return 'The server is running an older GitHub CLI than this feature expected; update `gh` if the board still cannot load.';
+  return 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).';
+}
+
 function issueColumns(items: Issue[]): Column<Issue>[] {
   const own = store.issues.columns;
   if (own?.length) return trackerColumns(items, own);
@@ -58,11 +63,9 @@ function trackerColumns(items: Issue[], own: IssueColumn[]): Column<Issue>[] {
 function pullColumns(items: Pull[]): Column<Pull>[] {
   const open = items.filter((p) => p.state === 'open');
   return [
-    { key: 'draft', title: '✏️ Draft', items: items.filter((p) => p.state === 'draft') },
     { key: 'review', title: '👀 In review', items: open.filter((p) => p.review !== 'approved') },
     { key: 'approved', title: '👍 Approved', items: open.filter((p) => p.review === 'approved') },
     { key: 'merged', title: '🎉 Merged', items: items.filter((p) => p.state === 'merged').sort(byUpdated), max: 30 },
-    { key: 'closed', title: '🗑️ Closed', items: items.filter((p) => p.state === 'closed').sort(byUpdated), max: 20 },
   ];
 }
 
@@ -274,7 +277,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
     body.replaceChildren();
     if (st.error && !st.items.length) {
       const gh = (kind === 'issues' ? store.currentFloor()?.tracker?.kind : store.currentFloor()?.host?.kind) === 'github';
-      body.append(h('div.board-error', {}, `Couldn't load from ${source()}: ${st.error}`, gh ? h('br') : null, gh ? h('small', {}, 'The server runs `gh` in the project directory — make sure it is installed and authenticated (gh auth login).') : null));
+      body.append(h('div.board-error', {}, `Couldn't load from ${source()}: ${st.error}`, gh ? h('br') : null, gh ? h('small', {}, githubErrorHint(st.error)) : null));
       return;
     }
     const all = boardLabels(st.items);

@@ -18,6 +18,9 @@
 //   Not started  no questions yet: prepare-wave hasn't run, a wave it depends on isn't done, or its
 //                roadmap isn't on main
 //
+// A wave with no ticket that names other modules' waves in its "Dotknuté moduly a ich vlny" table
+// labels each of them `viazaná na <module> <wave>` while it isn't done.
+//
 // A module's questions about the roadmap itself (v*-otazky-implementacna-roadmapa.md, on main or an
 // unmerged plan branch) are a card of their own while they wait.
 //
@@ -157,11 +160,10 @@ function roadmaps() {
     const service = /\bI-(\d+)\b/.exec(heading)?.[1];
     const slug = /`([a-z0-9-]+)`/.exec(heading)?.[1] ?? dir;
     const name = service ? `I-${service}` : slug;
-    if (!chosen({ dir, slug, name })) continue;
     const prefix = service ? `I${service}` : slug.toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 20);
     const waves = [];
     for (const v of versions) for (const w of v.waves) if (!waves.some((x) => x.id === w.id)) waves.push(w);
-    out.push({ file: base.file, ref: base.ref, slug, name, prefix, waves });
+    out.push({ file: base.file, ref: base.ref, slug, name, prefix, waves, shown: chosen({ dir, slug, name }) });
   }
   return out;
 }
@@ -336,8 +338,33 @@ const short = (ref) => ref.replace(/^origin\//, '');
 /** Where a questions file stands, if not on main. */
 const where = (q) => (!q.branch ? '' : unpushed.has(q.branch) ? ` na lokálnej \`${q.branch}\` (nepushnutá)` : ` na \`${short(q.branch)}\``);
 const issues = [];
+const all = roadmaps();
 
-for (const module of roadmaps()) {
+/**
+ * Ties between modules: a wave with no ticket names, in its section's table "Dotknuté moduly a ich
+ * vlny", the other modules and their waves it rests on (see the roadmap skill). Each of those waves
+ * gets a label naming it while it isn't done; by "<I-xx> <wave>".
+ */
+const ties = new Map();
+for (const module of all) {
+  for (const wave of module.waves) {
+    const section = /\*\*Dotknuté moduly a ich vlny:?\*\*:?\s*\n([\s\S]*?)(?:\n\s*\n|$)/.exec(wave.text ?? '')?.[1];
+    if (!section || done(module, wave)) continue;
+    for (const row of section.split('\n').filter((l) => /^\|/.test(l.trim()) && !/^\|[\s|:-]+\|$/.test(l.trim()))) {
+      const cells = row.trim().slice(1, -1).split('|').map((c) => c.trim());
+      const other = /\bI-\d+\b/.exec(cells[0] ?? '')?.[0];
+      if (!other || other === module.name) continue;
+      const place = placeOf(module, wave);
+      const tag = { name: `viazaná na ${module.name} ${wave.id}${place ? ` · ${COLUMNS.find((c) => c.key === place.column)?.title.replace(/^\S+\s/, '') ?? ''}` : ''}`, color: '#8250df' };
+      for (const id of (cells.at(-1) ?? '').match(/\bW\d+[a-z]?\b/gi) ?? []) {
+        const key = `${other} ${id.toUpperCase()}`;
+        ties.set(key, [...(ties.get(key) ?? []), tag]);
+      }
+    }
+  }
+}
+
+for (const module of all.filter((m) => m.shown)) {
   const moduleLabel = { name: module.name, color: '#57606a' };
   const roadmapAt = git(code, 'log', '-1', '--format=%cI', module.ref, '--', module.file);
   const url = pageOf(module.file, short(module.ref));
@@ -383,7 +410,7 @@ for (const module of roadmaps()) {
       url: pageOf(wave.file, short(wave.ref)),
       author: module.slug,
       column: place.column,
-      labels: [moduleLabel, ...place.labels, ...(wave.scope ? [{ name: wave.scope, color: '#8c959f' }] : [])],
+      labels: [moduleLabel, ...place.labels, ...(ties.get(`${module.name} ${wave.id.toUpperCase()}`) ?? []), ...(wave.scope ? [{ name: wave.scope, color: '#8c959f' }] : [])],
       assignees: tip ? [tip[0]] : [],
       createdAt: updated,
       updatedAt: updated,

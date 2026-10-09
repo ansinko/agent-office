@@ -13,8 +13,9 @@
 //   Waiting      its questions wait on the analyst: an unmerged origin/plan/*<module>-<wave>-* in the
 //                spec repository (or one only in the spec checkout, not pushed yet), or a
 //                questions/v*-otazky-implementacny-plan-<wave>.md on its main that isn't premietnute yet
-//   Ready        its questions are premietnute on the spec repository's main
-//   Not started  no questions yet (prepare-wave hasn't run), a wave it depends on isn't done, or its
+//   Ready        its questions are premietnute on the spec repository's main (labelled when its row
+//                is still only on a roadmap branch)
+//   Not started  no questions yet: prepare-wave hasn't run, a wave it depends on isn't done, or its
 //                roadmap isn't on main
 //
 // A module's questions about the roadmap itself (v*-otazky-implementacna-roadmapa.md, on main or an
@@ -324,8 +325,9 @@ function placeOf(module, wave) {
   const local = plan && unpushed.has(plan) ? [{ name: 'otázky nepushnuté', color: '#bc4c00' }] : [];
   if (plan || unanswered.length) return { column: 'waiting', plan, questions, labels: [...local, ...distinct(unanswered.map((q) => stavLabel(q.stav))), ...after] };
   if (unmerged.length) return { column: 'waiting', questions, labels: [{ name: `premietnuté v ${unmerged.join(', ')}, čaká na merge`, color: '#9a6700' }, ...after] };
-  if (wave.ref !== 'origin/main') return { column: 'not-started', questions, labels: [{ name: 'roadmap nie je v main', color: '#bc4c00' }] };
-  if (questions.length) return { column: 'ready', questions, labels: [stavLabel('premietnute'), ...after] };
+  const offMain = wave.ref !== 'origin/main' ? [{ name: 'roadmap nie je v main', color: '#bc4c00' }] : [];
+  if (questions.length) return { column: 'ready', questions, labels: [stavLabel('premietnute'), ...offMain, ...after] };
+  if (offMain.length) return { column: 'not-started', questions, labels: offMain };
   if (blockers.length) return { column: 'not-started', labels: [{ name: `blokovaná: ${blockers.join(', ')}`, color: '#cf222e' }] };
   return { column: 'not-started', labels: [{ name: 'bez prepare-wave', color: '#9a6700' }], prepare: true };
 }

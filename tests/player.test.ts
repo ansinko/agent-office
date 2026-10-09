@@ -90,11 +90,13 @@ test('walks up and down the office stairs without jumping', (t) => {
   const { player, keys, frames } = controller(t, colliders);
   player.pos.set(2.6, 0, 12);
   keys('KeyD', 'ShiftLeft');
-  frames(20, 0.05);
+  frames(14, 0.05);
   assert.ok(player.pos.x > 9.5, `stuck climbing at ${player.pos.toArray()}`);
   assert.equal(player.pos.y, 3);
   keys('KeyA', 'ShiftLeft');
-  frames(20, 0.05);
+  frames(14, 0.05);
+  keys();
+  frames(5, 0.05);
   assert.ok(player.pos.x < 3, `stuck descending at ${player.pos.toArray()}`);
   assert.equal(player.pos.y, 0);
 });

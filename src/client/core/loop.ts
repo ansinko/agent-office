@@ -14,7 +14,7 @@ import type { Frame } from './registry';
 import { FOV } from './scene';
 import { FirstPersonBody } from '../world/character/person-first';
 
-/** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is 4.6. */
+/** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is about 6.4. */
 const QUIET_FEET = 1.2;
 
 export interface LoopDeps {
